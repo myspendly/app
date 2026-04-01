@@ -324,8 +324,13 @@
     <div class="period-tab" onclick="setPeriod('all',this)">All time</div>
   </div>
 
+
   <div id="monthPickerWrap" style="display:none; margin-bottom:14px; overflow-x:auto; -webkit-overflow-scrolling:touch;">
     <div id="monthPicker" style="display:flex; gap:8px; padding-bottom:4px;"></div>
+  </div>
+
+  <div id="weekPickerWrap" style="display:none; margin-bottom:14px; overflow-x:auto; -webkit-overflow-scrolling:touch;">
+    <div id="weekPicker" style="display:flex; gap:8px; padding-bottom:4px;"></div>
   </div>
 
   <div class="metric-grid">
@@ -919,7 +924,16 @@ function setPeriod(p, btn) {
   renderDashboard();
 }
 
-let selectedMonth = null; // format: "YYYY-MM"
+let selectedMonth = null;
+let selectedWeekStart = null;
+
+function getMonday(date) {
+  const d = new Date(date);
+  const day = d.getDay();
+  d.setDate(d.getDate() + (day === 0 ? -6 : 1 - day));
+  d.setHours(0, 0, 0, 0);
+  return d;
+}
 
 function setPeriod(p, btn) {
   currentPeriod = p;
@@ -929,19 +943,25 @@ function setPeriod(p, btn) {
   if (p === 'month') {
     renderMonthPicker();
     document.getElementById('monthPickerWrap').style.display = '';
-  } else {
+    document.getElementById('weekPickerWrap').style.display = 'none';
+    selectedWeekStart = null;
+  } else if (p === 'week') {
+    renderWeekPicker();
+    document.getElementById('weekPickerWrap').style.display = '';
     document.getElementById('monthPickerWrap').style.display = 'none';
     selectedMonth = null;
+  } else {
+    document.getElementById('monthPickerWrap').style.display = 'none';
+    document.getElementById('weekPickerWrap').style.display = 'none';
+    selectedMonth = null;
+    selectedWeekStart = null;
   }
   renderDashboard();
 }
 
 function renderMonthPicker() {
-  // Get all unique months from data, sorted newest first
   const monthSet = new Set(DB.transactions.map(t => t.date.substring(0, 7)));
   const months = [...monthSet].sort().reverse();
-
-  // Default to most recent month if none selected
   if (!selectedMonth && months.length) selectedMonth = months[0];
 
   document.getElementById('monthPicker').innerHTML = months.map(m => {
@@ -949,13 +969,75 @@ function renderMonthPicker() {
     const label = new Date(y, mo - 1).toLocaleString('default', { month: 'short', year: '2-digit' });
     const isActive = m === selectedMonth;
     return `<div onclick="selectMonth('${m}')" style="
-      flex-shrink:0; padding: 6px 14px; border-radius: 20px; font-size: 13px; font-weight: 500;
-      cursor: pointer; white-space: nowrap; transition: all 0.15s;
-      background: ${isActive ? 'var(--accent)' : 'var(--bg3)'};
-      color: ${isActive ? '#0a0a0a' : 'var(--text2)'};
-      border: 0.5px solid ${isActive ? 'var(--accent)' : 'var(--border)'};
+      flex-shrink:0; padding:6px 14px; border-radius:20px; font-size:13px; font-weight:500;
+      cursor:pointer; white-space:nowrap;
+      background:${isActive ? 'var(--accent)' : 'var(--bg3)'};
+      color:${isActive ? '#0a0a0a' : 'var(--text2)'};
+      border:0.5px solid ${isActive ? 'var(--accent)' : 'var(--border)'};
     ">${label}</div>`;
   }).join('');
+}
+
+let selectedWeekMonth = null; // which month is selected in the week view
+
+function renderWeekPicker() {
+  // Get all unique months that have transactions
+  const monthSet = new Set(DB.transactions.map(t => t.date.substring(0, 7)));
+  const months = [...monthSet].sort().reverse();
+  if (!selectedWeekMonth && months.length) selectedWeekMonth = months[0];
+
+  // Get weeks within the selected month
+  const weekSet = new Set();
+  DB.transactions.forEach(t => {
+    const d = new Date(t.date + 'T00:00:00');
+    const mKey = `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}`;
+    if (mKey === selectedWeekMonth) {
+      const monday = getMonday(d);
+      weekSet.add(monday.toISOString().split('T')[0]);
+    }
+  });
+  const weeksInMonth = [...weekSet].sort();
+  if (!selectedWeekStart || !weeksInMonth.includes(selectedWeekStart)) {
+    selectedWeekStart = weeksInMonth[weeksInMonth.length - 1] || null;
+  }
+
+  // Render month dropdown
+  const monthOptions = months.map(m => {
+    const [y, mo] = m.split('-');
+    const label = new Date(y, mo - 1).toLocaleString('default', { month: 'long', year: 'numeric' });
+    return `<option value="${m}" ${m === selectedWeekMonth ? 'selected' : ''}>${label}</option>`;
+  }).join('');
+
+  // Render week pills
+  const weekPills = weeksInMonth.map((w, idx) => {
+    const isActive = w === selectedWeekStart;
+    return `<div onclick="selectWeek('${w}')" style="
+      flex-shrink:0; padding:6px 14px; border-radius:20px; font-size:13px; font-weight:500;
+      cursor:pointer; white-space:nowrap;
+      background:${isActive ? 'var(--accent)' : 'var(--bg3)'};
+      color:${isActive ? '#0a0a0a' : 'var(--text2)'};
+      border:0.5px solid ${isActive ? 'var(--accent)' : 'var(--border)'};
+    ">Week ${idx + 1}</div>`;
+  }).join('');
+
+  document.getElementById('weekPicker').innerHTML = `
+    <select onchange="selectWeekMonth(this.value)" style="
+      width:100%; margin-bottom:10px; padding:10px 14px; border-radius:12px;
+      background:var(--bg3); border:0.5px solid var(--border2);
+      color:var(--text); font-family:var(--font); font-size:14px; font-weight:500;
+      appearance:none; -webkit-appearance:none;
+      background-image:url('data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 width=%2216%22 height=%2216%22 fill=%22%23666%22 viewBox=%220 0 16 16%22%3E%3Cpath d=%22M7.247 11.14L2.451 5.658C1.885 5.013 2.345 4 3.204 4h9.592a1 1 0 0 1 .753 1.659l-4.796 5.48a1 1 0 0 1-1.506 0z%22/%3E%3C/svg%3E');
+      background-repeat:no-repeat; background-position:right 14px center;
+    ">${monthOptions}</select>
+    <div style="display:flex; gap:8px;">${weekPills}</div>
+  `;
+}
+
+function selectWeekMonth(m) {
+  selectedWeekMonth = m;
+  selectedWeekStart = null;
+  renderWeekPicker();
+  renderDashboard();
 }
 
 function selectMonth(m) {
@@ -964,9 +1046,13 @@ function selectMonth(m) {
   renderDashboard();
 }
 
-function filterByPeriod(txns, period) {
-  const now = new Date();
+function selectWeek(w) {
+  selectedWeekStart = w;
+  renderWeekPicker();
+  renderDashboard();
+}
 
+function filterByPeriod(txns, period) {
   if (period === 'month' && selectedMonth) {
     const [y, mo] = selectedMonth.split('-').map(Number);
     return txns.filter(t => {
@@ -975,24 +1061,28 @@ function filterByPeriod(txns, period) {
     });
   }
 
-  // Find the most recent date in the data
+  if (period === 'week' && selectedWeekStart) {
+    const start = new Date(selectedWeekStart + 'T00:00:00');
+    const end = new Date(start); end.setDate(start.getDate() + 6); end.setHours(23, 59, 59, 999);
+    return txns.filter(t => {
+      const d = new Date(t.date + 'T00:00:00');
+      return d >= start && d <= end;
+    });
+  }
+
+  const now = new Date();
   const latestDate = txns.length
-    ? new Date(txns.reduce((latest, t) => t.date > latest ? t.date : latest, txns[0].date))
+    ? new Date(txns.reduce((l, t) => t.date > l ? t.date : l, txns[0].date))
     : now;
   const ref = latestDate > now ? now : latestDate;
 
   return txns.filter(t => {
     const d = new Date(t.date);
-    if (period === 'week') {
-      const weekAgo = new Date(ref); weekAgo.setDate(ref.getDate() - 7);
-      return d >= weekAgo && d <= ref;
-    }
-    if (period === 'year') {
-      return d.getFullYear() === ref.getFullYear();
-    }
+    if (period === 'year') return d.getFullYear() === ref.getFullYear();
     return true;
   });
 }
+
 
 // ─── DASHBOARD ────────────────────────────────────────────────────────────────
 let barChartInst = null;
@@ -1047,12 +1137,24 @@ function renderDashboard() {
   if (currentPeriod === 'month' && selectedMonth) {
     const [y, mo] = selectedMonth.split('-');
     periodLabel = new Date(y, mo - 1).toLocaleString('default', { month: 'long', year: 'numeric' });
+  } else if (currentPeriod === 'week' && selectedWeekStart && selectedWeekMonth) {
+    const [y, mo] = selectedWeekMonth.split('-');
+    const monthName = new Date(y, mo - 1).toLocaleString('default', { month: 'long', year: 'numeric' });
+    const weekSet = new Set();
+    DB.transactions.forEach(t => {
+      const d = new Date(t.date + 'T00:00:00');
+      const mKey = `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}`;
+      if (mKey === selectedWeekMonth) weekSet.add(getMonday(d).toISOString().split('T')[0]);
+    });
+    const weeksInMonth = [...weekSet].sort();
+    const weekNum = weeksInMonth.indexOf(selectedWeekStart) + 1;
+    periodLabel = `Week ${weekNum} · ${monthName}`;
   } else {
     const latestDate = DB.transactions.length
       ? new Date(DB.transactions.reduce((l, t) => t.date > l ? t.date : l, DB.transactions[0].date))
       : new Date();
     const refDate = latestDate > new Date() ? new Date() : latestDate;
-    const subtitles = { week: 'Last 7 days', year: `Year ${refDate.getFullYear()}`, all: 'All time' };
+    const subtitles = { year: `Year ${refDate.getFullYear()}`, all: 'All time' };
     periodLabel = subtitles[currentPeriod] || '';
   }
   document.getElementById('dashSubtitle').textContent = periodLabel;
