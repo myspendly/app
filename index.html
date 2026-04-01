@@ -1165,8 +1165,9 @@ let barChartInst = null;
 function renderDashboard() {
   const allPeriod = filterByPeriod(DB.transactions, currentPeriod);
   // Expenses = debits excluding transfers
-  const expenses = allPeriod.filter(t => t.isDebit && t.category !== 'Transfers');
-  const total = expenses.reduce((s, t) => s + t.amount, 0);
+  const expenses = allPeriod.filter(t => t.category !== 'Transfers' && t.category !== 'Income');
+  // Net total: debits minus credits (refunds) within expense categories
+  const total = expenses.reduce((s, t) => s + (t.isDebit ? t.amount : -t.amount), 0);
   const count = expenses.length;
 
   const income = allPeriod.filter(t => t.category === 'Income').reduce((s, t) => s + t.amount, 0);
@@ -1243,7 +1244,9 @@ function renderDashboard() {
     }
     // Top expense category
     const catTotals = {};
-    expenses.forEach(t => { catTotals[t.category] = (catTotals[t.category]||0) + t.amount; });
+    expenses.forEach(t => {
+      catTotals[t.category] = (catTotals[t.category]||0) + (t.isDebit ? t.amount : -t.amount);
+    });
     const topCats = Object.entries(catTotals).sort((a,b)=>b[1]-a[1]);
     if (topCats.length) {
       document.getElementById('m-top-cat').textContent = (CATS[topCats[0][0]]?.emoji || '📦') + ' ' + topCats[0][0];
@@ -1262,15 +1265,21 @@ function renderDashboard() {
 }
 
 function renderCatBreakdown(txns) {
-  // Group ALL transactions by category
+  // Group ALL transactions by category — credits reduce the total (refunds)
   const catTotals = {};
   txns.forEach(t => {
-    if (!catTotals[t.category]) catTotals[t.category] = { total: 0, count: 0, isExpense: t.isDebit };
-    catTotals[t.category].total += t.amount;
+    if (!catTotals[t.category]) catTotals[t.category] = { total: 0, count: 0, debits: 0, credits: 0 };
+    if (t.isDebit) {
+      catTotals[t.category].total += t.amount;
+      catTotals[t.category].debits++;
+    } else {
+      catTotals[t.category].total -= t.amount; // refund — deduct from total
+      catTotals[t.category].credits++;
+    }
     catTotals[t.category].count++;
   });
   const sorted = Object.entries(catTotals).sort((a,b) => b[1].total - a[1].total);
-  const maxAmt = sorted[0]?.[1].total || 1;
+  const maxAmt = Math.max(...sorted.map(([,d]) => Math.abs(d.total)), 1);
 
   // Non-expense categories shown separately at bottom
   const expenseCats  = sorted.filter(([cat]) => cat !== 'Income' && cat !== 'Transfers');
@@ -1281,15 +1290,17 @@ function renderCatBreakdown(txns) {
     const c = CATS[cat] || CATS['Other'];
     const isIncome = cat === 'Income';
     const isTransfer = cat === 'Transfers';
+    const netAmt = data.total;
+    const refundNote = data.credits > 0 ? ` <span style="font-size:10px; color:#c8f565;">(${data.credits} refund${data.credits>1?'s':''})</span>` : '';
     return `
       <div class="cat-item" onclick="openCatSheet('${cat}')" style="cursor:pointer;">
         <div class="cat-icon" style="background:${c.dim}">${c.emoji}</div>
         <div class="cat-info">
-          <div class="cat-name">${cat} <span style="font-size:11px; color:var(--text3);">${data.count} txn${data.count!==1?'s':''}</span></div>
-          <div class="cat-bar-wrap"><div class="cat-bar" style="width:${Math.round(data.total/maxAmt*100)}%; background:${c.color};"></div></div>
+          <div class="cat-name">${cat}${refundNote} <span style="font-size:11px; color:var(--text3);">${data.count} txn${data.count!==1?'s':''}</span></div>
+          <div class="cat-bar-wrap"><div class="cat-bar" style="width:${Math.round(Math.abs(netAmt)/maxAmt*100)}%; background:${netAmt < 0 ? '#c8f565' : c.color};"></div></div>
         </div>
-        <div class="cat-amount" style="color:${isIncome ? '#c8f565' : isTransfer ? '#64b5f6' : 'var(--text)'}">
-          ${isIncome ? '+' : ''}${fmt(data.total)}
+        <div class="cat-amount" style="color:${isIncome ? '#c8f565' : isTransfer ? '#64b5f6' : netAmt <= 0 ? '#c8f565' : 'var(--text)'}">
+          ${isIncome ? '+' : netAmt < 0 ? '+' : ''}${fmt(Math.abs(netAmt))}
         </div>
       </div>`;
   }).join('');
@@ -1669,7 +1680,7 @@ function renderAnalytics() {
     const key = `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}`;
     if (!monthMap[key]) monthMap[key] = { income: 0, spend: 0 };
     if (t.category === 'Income') monthMap[key].income += t.amount;
-    else if (t.isDebit && t.category !== 'Transfers') monthMap[key].spend += t.amount;
+    else if (t.category !== 'Transfers') monthMap[key].spend += t.isDebit ? t.amount : -t.amount;
   });
 
   const months = Object.keys(monthMap).sort();
@@ -1711,7 +1722,7 @@ function renderAnalytics() {
     const key = `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}`;
     if (!allMonthMap[key]) allMonthMap[key] = { income: 0, spend: 0 };
     if (t.category === 'Income') allMonthMap[key].income += t.amount;
-    else if (t.isDebit && t.category !== 'Transfers') allMonthMap[key].spend += t.amount;
+    else if (t.category !== 'Transfers') allMonthMap[key].spend += t.isDebit ? t.amount : -t.amount;
   });
   const allMonths = Object.keys(allMonthMap);
   const n = allMonths.length || 1;
@@ -1731,10 +1742,11 @@ function renderAnalytics() {
   document.getElementById('pieSectionLabel').textContent = `Spending by category · ${periodLabels[analyticsPeriod]}`;
 
   const catTotals = {};
-  txns.filter(t => t.isDebit && t.category !== 'Transfers' && t.category !== 'Income').forEach(t => {
-    catTotals[t.category] = (catTotals[t.category] || 0) + t.amount;
+  txns.filter(t => t.category !== 'Transfers' && t.category !== 'Income').forEach(t => {
+    catTotals[t.category] = (catTotals[t.category] || 0) + (t.isDebit ? t.amount : -t.amount);
   });
-  const catEntries = Object.entries(catTotals).sort((a,b) => b[1]-a[1]);
+  // Only show categories with a positive net (spent more than refunded)
+  const catEntries = Object.entries(catTotals).filter(([,v]) => v > 0).sort((a,b) => b[1]-a[1]);
   const pieColors  = catEntries.map(([cat]) => CATS[cat]?.color || '#555');
   const pieTotal   = catEntries.reduce((s,[,v]) => s+v, 0);
 
@@ -1786,10 +1798,10 @@ function renderAnalytics() {
 
   // ── Top merchants ──
   const merchantTotals = {};
-  txns.filter(t => t.isDebit && t.category !== 'Transfers').forEach(t => {
-    merchantTotals[t.merchant] = (merchantTotals[t.merchant] || 0) + t.amount;
+  txns.filter(t => t.category !== 'Transfers').forEach(t => {
+    merchantTotals[t.merchant] = (merchantTotals[t.merchant] || 0) + (t.isDebit ? t.amount : -t.amount);
   });
-  const topMerchants = Object.entries(merchantTotals).sort((a,b) => b[1]-a[1]).slice(0, 10);
+  const topMerchants = Object.entries(merchantTotals).filter(([,v]) => v > 0).sort((a,b) => b[1]-a[1]).slice(0, 10);
   const maxMerchant = topMerchants[0]?.[1] || 1;
   document.getElementById('topMerchants').innerHTML = topMerchants.map(([name, amt], i) => `
     <div style="display:flex; align-items:center; gap:10px; padding:9px 0; border-bottom:0.5px solid var(--border);">
