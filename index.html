@@ -341,6 +341,23 @@
     </div>
   </div>
 
+  <div class="card" id="savingsCard" style="margin-bottom:12px;">
+    <div style="display:flex; align-items:center; justify-content:space-between;">
+      <div>
+        <div class="metric-label" style="margin-bottom:6px;">💾 Savings</div>
+        <div style="font-size:28px; font-weight:600; letter-spacing:-0.03em;" id="m-savings">$0</div>
+        <div style="font-size:12px; color:var(--text2); margin-top:4px;" id="m-savings-sub">Income minus expenses</div>
+      </div>
+      <div id="m-savings-pct" style="font-size:36px; font-weight:600; letter-spacing:-0.03em; color:var(--text2);">—</div>
+    </div>
+    <div style="margin-top:14px; height:6px; background:var(--bg4); border-radius:3px; overflow:hidden;">
+      <div id="m-savings-bar" style="height:100%; border-radius:3px; width:0%; transition: width 0.4s ease;"></div>
+    </div>
+    <div style="display:flex; justify-content:space-between; margin-top:6px; font-size:11px; color:var(--text3);">
+      <span>Spent</span><span>Saved</span>
+    </div>
+  </div>
+
   <div class="metric-grid">
     <div class="metric-card">
       <div class="metric-label">Biggest spend</div>
@@ -603,6 +620,7 @@ const CATS = {
   'Travel':          { emoji: '✈️', color: '#c8f565', dim: 'rgba(200,245,101,0.15)' },
   'Education':       { emoji: '📚', color: '#ffb74d', dim: 'rgba(255,183,77,0.15)' },
   'Personal care':   { emoji: '💆', color: '#f06292', dim: 'rgba(240,98,146,0.15)' },
+  'ARC Costs':       { emoji: '🏗️', color: '#80cbc4', dim: 'rgba(128,203,196,0.15)' },
   'Income':          { emoji: '💰', color: '#c8f565', dim: 'rgba(200,245,101,0.15)' },
   'Transfers':       { emoji: '🔄', color: '#64b5f6', dim: 'rgba(100,181,246,0.15)' },
   'Other':           { emoji: '📦', color: '#555', dim: 'rgba(85,85,85,0.15)' },
@@ -987,10 +1005,42 @@ function renderDashboard() {
   const count = expenses.length;
 
   const income = allPeriod.filter(t => t.category === 'Income').reduce((s, t) => s + t.amount, 0);
+  const savings = income - total;
+  const savingsPct = income > 0 ? Math.round(savings / income * 100) : 0;
+  const savedBarPct = income > 0 ? Math.max(0, Math.min(100, savingsPct)) : 0;
 
   document.getElementById('m-total').textContent = fmt(total);
   document.getElementById('m-count').textContent = fmt(income);
-  document.getElementById('m-avg').textContent = income ? `this period` : 'no income recorded';
+  document.getElementById('m-avg').textContent = income ? 'this period' : 'no income recorded';
+
+  // Savings card
+  const savingsEl = document.getElementById('m-savings');
+  const savingsSubEl = document.getElementById('m-savings-sub');
+  const savingsPctEl = document.getElementById('m-savings-pct');
+  const savingsBarEl = document.getElementById('m-savings-bar');
+
+  savingsEl.textContent = fmt(Math.abs(savings));
+  savingsEl.style.color = savings >= 0 ? '#c8f565' : '#ff6b6b';
+
+  if (income === 0) {
+    savingsSubEl.textContent = 'No income recorded yet';
+    savingsPctEl.textContent = '—';
+    savingsPctEl.style.color = 'var(--text3)';
+    savingsBarEl.style.width = '0%';
+    savingsBarEl.style.background = 'var(--bg4)';
+  } else if (savings >= 0) {
+    savingsSubEl.textContent = `You saved ${savingsPct}% of your income`;
+    savingsPctEl.textContent = `${savingsPct}%`;
+    savingsPctEl.style.color = '#c8f565';
+    savingsBarEl.style.width = `${savedBarPct}%`;
+    savingsBarEl.style.background = '#c8f565';
+  } else {
+    savingsSubEl.textContent = `You spent ${Math.abs(savingsPct)}% more than you earned`;
+    savingsPctEl.textContent = `-${Math.abs(savingsPct)}%`;
+    savingsPctEl.style.color = '#ff6b6b';
+    savingsBarEl.style.width = '100%';
+    savingsBarEl.style.background = '#ff6b6b';
+  }
 
   // Build subtitle
   let periodLabel = '';
