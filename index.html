@@ -617,12 +617,14 @@ const RULES = [
   { cat: 'Transport', kw: ['opal','myki','go card','translink','bus','train','tram','taxi','uber','ola ','didi','lyft','ampol','bp ','shell','caltex','7-eleven fuel','petrol','parking','wilson park','care park','service station'] },
   { cat: 'Subscriptions', kw: ['netflix','spotify','amazon prime','disney','binge','kayo','stan ','apple','google one','icloud','microsoft','adobe','canva','dropbox','youtube','youtube premium','foxtel'] },
   { cat: 'Health', kw: ['chemist','pharmacy','priceline','terry white','amcal','doctor','medical','clinic','gp ','dentist','physio','optometrist','hospital','pathology','bulk bill'] },
-  { cat: 'Shopping', kw: ['amazon','jb hi-fi','harvey norm','the good guys','target','kmart','big w','myer','david jones','cotton on','uniqlo','zara','h&m','asos','ebay','catch','oz sale','rebel sport','lululemon','glue store'] },
+  { cat: 'Shopping', kw: ['amazon','jb hi-fi','harvey norm','the good guys','target','kmart','big w','myer','david jones','cotton on','uniqlo','zara','h&m','asos','ebay','catch','oz sale','rebel sport','lululemon','glue store','afterpay','zip pay','humm','depop','vinted','paypal'] },
   { cat: 'Entertainment', kw: ['cinema','event cinema','hoyts','village cinema','reading cinema','ticketek','ticketmaster','eventbrite','gaming','playstation','xbox','steam ','movie','concert','live nation'] },
-  { cat: 'Travel', kw: ['qantas','virgin australia','jetstar','tigerair','rex airline','airbnb','booking.com','expedia','hotel','motel','resort','agoda','wotif','flight centre','skyscanner'] },
+  { cat: 'Travel', kw: ['qantas','virgin australia','jetstar','tigerair','rex airline','airbnb','booking.com','expedia','hotel','motel','resort','agoda','wotif','flight centre','skyscanner','wise transfer','wise'] },
   { cat: 'Education', kw: ['university','tafe','udemy','coursera','skillshare','tutoring','school','textbook','stationary'] },
   { cat: 'Personal care', kw: ['haircut','salon','barber','spa','nail','beauty','wax','massage','gym','fitness','anytime fitness','f45','crossfit','yoga','pilates'] },
-  { cat: 'Income', kw: ['salary','payroll','deposit','transfer in','interest','dividend','tax refund','centrelink','ato refund','transfer credit'] },
+  { cat: 'Health', kw: ['chemist','pharmacy','priceline','terry white','amcal','doctor','medical','clinic','gp ','dentist','physio','optometrist','hospital','pathology','bulk bill','specsaver','optical'] },
+  { cat: 'Transfers', kw: ['home loan','loan repayment','holiday funds','savings','offset'] },
+  { cat: 'Income', kw: ['salary','payroll','wage','interest','dividend','tax refund','centrelink','ato refund'] },
 ];
 
 function categorise(merchant) {
@@ -668,13 +670,27 @@ function parseCSV(text) {
       // Negative = debit (expense), positive = credit (income)
       const isDebit = amount < 0;
 
+      // Detect category from the RAW description prefix BEFORE cleaning
+      // This way "TRANSFER CREDIT FROM..." → Income, "TRANSFER DEBIT TO..." → Transfers
+      // "LOAN REPAYMENT..." → Transfers, "DIRECT CREDIT..." → Income
+      let prefixCat = null;
+      const rawLower = rawDesc.toLowerCase();
+      if (/^transfer credit/i.test(rawDesc) || /^direct credit/i.test(rawDesc)) {
+        prefixCat = 'Income';
+      } else if (/^transfer debit/i.test(rawDesc) || /^loan repayment/i.test(rawDesc)) {
+        prefixCat = 'Transfers';
+      }
+
       // Clean up Suncorp's verbose descriptions:
       // "VISA PURCHASE   COLES  4460 Casuarina    30/03 AU AUD" → "Coles 4460 Casuarina"
+      // "TRANSFER CREDIT FROM 503819035 TYWNN BROOKEWALKER" → "Tywnn Brookewalker"
       let merchant = rawDesc
-        .replace(/^(VISA PURCHASE|EFTPOS|DIRECT DEBIT|DIRECT CREDIT|TRANSFER CREDIT|TRANSFER DEBIT|BPAY|ATM WITHDRAWAL|INTERNET TRANSFER)\s*/i, '')
+        .replace(/^(VISA PURCHASE|EFTPOS WDL|EFTPOS|DIRECT DEBIT|DIRECT CREDIT|TRANSFER CREDIT FROM \d+|TRANSFER CREDIT|TRANSFER DEBIT TO \d+ \d+|TRANSFER DEBIT|LOAN REPAYMENT TO \d+|LOAN REPAYMENT|BPAY|ATM WITHDRAWAL|INTERNET TRANSFER)\s*/i, '')
         .replace(/\s+\d{2}\/\d{2}\s+(AU\s+)?AUD\s*$/i, '')
         .replace(/\s+/g, ' ')
         .trim();
+
+      const category = prefixCat || categorise(merchant);
 
       rows.push({
         id: Date.now() + '-' + i,
@@ -682,7 +698,7 @@ function parseCSV(text) {
         merchant: cleanMerchant(merchant),
         rawMerchant: rawDesc,
         amount: parseFloat(Math.abs(amount).toFixed(2)),
-        category: categorise(merchant),
+        category,
         isDebit,
         learned: !!DB.learned[merchant.toLowerCase()],
       });
