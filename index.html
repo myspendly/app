@@ -544,6 +544,22 @@
   </div>
 </div>
 
+<!-- CATEGORY DRILL-DOWN SHEET -->
+<div class="sheet-overlay" id="catSheet" onclick="closeCatSheet(event)">
+  <div class="sheet" style="max-height: 90vh;">
+    <div class="sheet-handle"></div>
+    <div style="display:flex; align-items:center; gap:12px; margin-bottom:20px;">
+      <div id="catSheetIcon" style="width:44px; height:44px; border-radius:14px; display:flex; align-items:center; justify-content:center; font-size:22px;"></div>
+      <div>
+        <div class="sheet-title" id="catSheetTitle" style="margin-bottom:2px;"></div>
+        <div id="catSheetTotal" style="font-size:13px; color:var(--text2);"></div>
+      </div>
+    </div>
+    <div id="catSheetTxns"></div>
+    <div style="height:12px;"></div>
+  </div>
+</div>
+
 <!-- TOAST -->
 <div class="toast" id="toast"></div>
 
@@ -671,7 +687,7 @@ function parseCSV(text) {
         learned: !!DB.learned[merchant.toLowerCase()],
       });
     }
-    return rows.filter(r => r.isDebit || r.category === 'Transfers');
+    return rows; // include all — debits, credits, transfers
   }
 
   // ── Generic / other banks ──
@@ -725,7 +741,7 @@ function parseCSV(text) {
       learned: !!DB.learned[merchant.toLowerCase()],
     });
   }
-  return rows.filter(r => r.isDebit);
+  return rows; // include all transactions
 }
 
 function splitCSVLine(line) {
@@ -897,16 +913,16 @@ let barChartInst = null;
 
 function renderDashboard() {
   const allPeriod = filterByPeriod(DB.transactions, currentPeriod);
-  // Exclude transfers and income from spending calculations
-  const txns = allPeriod.filter(t => t.category !== 'Transfers' && t.category !== 'Income');
-  const total = txns.reduce((s, t) => s + t.amount, 0);
-  const count = txns.length;
+  // Expenses = debits excluding transfers
+  const expenses = allPeriod.filter(t => t.isDebit && t.category !== 'Transfers');
+  const total = expenses.reduce((s, t) => s + t.amount, 0);
+  const count = expenses.length;
 
   document.getElementById('m-total').textContent = fmt(total);
   document.getElementById('m-count').textContent = count;
   document.getElementById('m-avg').textContent = count ? `avg ${fmt(total/count)} each` : 'no transactions';
 
-  // Build a helpful subtitle showing actual period
+  // Build subtitle
   const latestDate = DB.transactions.length
     ? new Date(DB.transactions.reduce((l, t) => t.date > l ? t.date : l, DB.transactions[0].date))
     : new Date();
@@ -915,19 +931,22 @@ function renderDashboard() {
   const subtitles = { week: 'Last 7 days', month: monthName, year: `Year ${refDate.getFullYear()}`, all: 'All time' };
   document.getElementById('dashSubtitle').textContent = subtitles[currentPeriod] || '';
 
-  if (txns.length) {
-    const sorted = [...txns].sort((a,b) => b.amount - a.amount);
-    const big = sorted[0];
-    document.getElementById('m-biggest').textContent = fmt(big.amount);
-    document.getElementById('m-biggest-cat').textContent = big.merchant;
-
+  if (allPeriod.length) {
+    // Biggest expense
+    const sorted = [...expenses].sort((a,b) => b.amount - a.amount);
+    if (sorted.length) {
+      document.getElementById('m-biggest').textContent = fmt(sorted[0].amount);
+      document.getElementById('m-biggest-cat').textContent = sorted[0].merchant;
+    }
+    // Top expense category
     const catTotals = {};
-    txns.forEach(t => { catTotals[t.category] = (catTotals[t.category]||0) + t.amount; });
-    const topCat = Object.entries(catTotals).sort((a,b)=>b[1]-a[1])[0];
-    document.getElementById('m-top-cat').textContent = (CATS[topCat[0]]?.emoji || '📦') + ' ' + topCat[0];
-    document.getElementById('m-top-cat-amt').textContent = fmt(topCat[1]);
-
-    renderCatBreakdown(txns);
+    expenses.forEach(t => { catTotals[t.category] = (catTotals[t.category]||0) + t.amount; });
+    const topCats = Object.entries(catTotals).sort((a,b)=>b[1]-a[1]);
+    if (topCats.length) {
+      document.getElementById('m-top-cat').textContent = (CATS[topCats[0][0]]?.emoji || '📦') + ' ' + topCats[0][0];
+      document.getElementById('m-top-cat-amt').textContent = fmt(topCats[0][1]);
+    }
+    renderCatBreakdown(allPeriod);
   } else {
     document.getElementById('m-biggest').textContent = '—';
     document.getElementById('m-biggest-cat').textContent = '—';
@@ -940,24 +959,50 @@ function renderDashboard() {
 }
 
 function renderCatBreakdown(txns) {
+  // Group ALL transactions by category
   const catTotals = {};
-  txns.forEach(t => { catTotals[t.category] = (catTotals[t.category]||0) + t.amount; });
-  const sorted = Object.entries(catTotals).sort((a,b)=>b[1]-a[1]);
-  const max = sorted[0]?.[1] || 1;
+  txns.forEach(t => {
+    if (!catTotals[t.category]) catTotals[t.category] = { total: 0, count: 0, isExpense: t.isDebit };
+    catTotals[t.category].total += t.amount;
+    catTotals[t.category].count++;
+  });
+  const sorted = Object.entries(catTotals).sort((a,b) => b[1].total - a[1].total);
+  const maxAmt = sorted[0]?.[1].total || 1;
 
-  document.getElementById('catBreakdown').innerHTML = sorted.map(([cat, amt]) => {
+  // Non-expense categories shown separately at bottom
+  const expenseCats  = sorted.filter(([cat]) => cat !== 'Income' && cat !== 'Transfers');
+  const incomeCats   = sorted.filter(([cat]) => cat === 'Income');
+  const transferCats = sorted.filter(([cat]) => cat === 'Transfers');
+
+  const renderGroup = (items) => items.map(([cat, data]) => {
     const c = CATS[cat] || CATS['Other'];
+    const isIncome = cat === 'Income';
+    const isTransfer = cat === 'Transfers';
     return `
-      <div class="cat-item">
+      <div class="cat-item" onclick="openCatSheet('${cat}')" style="cursor:pointer;">
         <div class="cat-icon" style="background:${c.dim}">${c.emoji}</div>
         <div class="cat-info">
-          <div class="cat-name">${cat}</div>
-          <div class="cat-bar-wrap"><div class="cat-bar" style="width:${Math.round(amt/max*100)}%; background:${c.color};"></div></div>
+          <div class="cat-name">${cat} <span style="font-size:11px; color:var(--text3);">${data.count} txn${data.count!==1?'s':''}</span></div>
+          <div class="cat-bar-wrap"><div class="cat-bar" style="width:${Math.round(data.total/maxAmt*100)}%; background:${c.color};"></div></div>
         </div>
-        <div class="cat-amount">${fmt(amt)}</div>
-      </div>
-    `;
+        <div class="cat-amount" style="color:${isIncome ? '#c8f565' : isTransfer ? '#64b5f6' : 'var(--text)'}">
+          ${isIncome ? '+' : ''}${fmt(data.total)}
+        </div>
+      </div>`;
   }).join('');
+
+  const sectionLabel = (text) => `<div style="font-size:11px; color:var(--text3); text-transform:uppercase; letter-spacing:0.06em; padding: 14px 0 6px;">${text}</div>`;
+
+  let html = renderGroup(expenseCats);
+  if (incomeCats.length) {
+    html += sectionLabel('Income');
+    html += renderGroup(incomeCats);
+  }
+  if (transferCats.length) {
+    html += sectionLabel('Transfers');
+    html += renderGroup(transferCats);
+  }
+  document.getElementById('catBreakdown').innerHTML = html;
 }
 
 function renderBarChart() {
@@ -1020,8 +1065,9 @@ function renderTransactions() {
 
   let html = '';
   for (const [month, items] of Object.entries(groups)) {
-    const monthTotal = items.reduce((s,t)=>s+t.amount,0);
-    html += `<div class="month-header">${month} &nbsp;<span style="font-weight:400; color: var(--text3);">${fmt(monthTotal)}</span></div>`;
+    const monthTotal = items.reduce((s,t) => s + (t.isDebit ? -t.amount : t.amount), 0);
+    const netColor = monthTotal >= 0 ? '#c8f565' : 'var(--text3)';
+    html += `<div class="month-header">${month} &nbsp;<span style="font-weight:400; color:${netColor};">${monthTotal >= 0 ? '+' : ''}${fmt(Math.abs(monthTotal))}</span></div>`;
     html += `<div class="card" style="padding: 4px 16px;">`;
     items.forEach(t => {
       const c = CATS[t.category] || CATS['Other'];
@@ -1033,7 +1079,7 @@ function renderTransactions() {
             <div class="txn-meta">${t.category}</div>
           </div>
           <div class="txn-right">
-            <div class="txn-amount">-${fmt(t.amount)}</div>
+            <div class="txn-amount" style="color:${t.isDebit ? 'var(--text)' : '#c8f565'}">${t.isDebit ? '-' : '+'}${fmt(t.amount)}</div>
             <div class="txn-date">${formatDate(t.date)}</div>
           </div>
         </div>`;
@@ -1242,6 +1288,48 @@ function showToast(msg) {
   t.textContent = msg;
   t.classList.add('show');
   setTimeout(() => t.classList.remove('show'), 2800);
+}
+
+// ─── CATEGORY DRILL-DOWN SHEET ────────────────────────────────────────────────
+let currentCatSheet = null;
+
+function openCatSheet(cat) {
+  currentCatSheet = cat;
+  const c = CATS[cat] || CATS['Other'];
+  const allPeriod = filterByPeriod(DB.transactions, currentPeriod);
+  const txns = allPeriod.filter(t => t.category === cat).sort((a,b) => new Date(b.date) - new Date(a.date));
+  const total = txns.reduce((s,t) => s + t.amount, 0);
+
+  document.getElementById('catSheetIcon').style.background = c.dim;
+  document.getElementById('catSheetIcon').textContent = c.emoji;
+  document.getElementById('catSheetTitle').textContent = cat;
+  document.getElementById('catSheetTotal').textContent = `${txns.length} transaction${txns.length!==1?'s':''} · ${cat === 'Income' ? '+' : ''}${fmt(total)}`;
+
+  document.getElementById('catSheetTxns').innerHTML = txns.length ? txns.map(t => `
+    <div class="txn-item" onclick="openTxnSheetFromCat('${t.id}')">
+      <div class="txn-info">
+        <div class="txn-merchant">${t.merchant}${t.learned ? '<span class="learned-dot"></span>' : ''}</div>
+        <div class="txn-meta">${formatDate(t.date)}</div>
+      </div>
+      <div class="txn-right">
+        <div class="txn-amount" style="color:${t.isDebit ? 'var(--text)' : '#c8f565'}">${t.isDebit ? '-' : '+'}${fmt(t.amount)}</div>
+      </div>
+    </div>`).join('')
+  : `<div style="text-align:center; padding: 30px 0; font-size:13px; color:var(--text2);">No transactions in this period</div>`;
+
+  document.getElementById('catSheet').classList.add('open');
+}
+
+function closeCatSheet(e) {
+  if (!e || e.target === document.getElementById('catSheet')) {
+    document.getElementById('catSheet').classList.remove('open');
+  }
+}
+
+function openTxnSheetFromCat(id) {
+  // Close cat sheet first, open txn sheet
+  document.getElementById('catSheet').classList.remove('open');
+  setTimeout(() => openTxnSheet(id), 200);
 }
 
 // ─── INIT ──────────────────────────────────────────────────────────────────────
