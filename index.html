@@ -598,7 +598,7 @@ const RULES = [
   { cat: 'Travel', kw: ['qantas','virgin australia','jetstar','tigerair','rex airline','airbnb','booking.com','expedia','hotel','motel','resort','agoda','wotif','flight centre','skyscanner'] },
   { cat: 'Education', kw: ['university','tafe','udemy','coursera','skillshare','tutoring','school','textbook','stationary'] },
   { cat: 'Personal care', kw: ['haircut','salon','barber','spa','nail','beauty','wax','massage','gym','fitness','anytime fitness','f45','crossfit','yoga','pilates'] },
-  { cat: 'Income', kw: ['salary','payroll','deposit','transfer in','interest','dividend','tax refund','centrelink','ato refund'] },
+  { cat: 'Income', kw: ['salary','payroll','deposit','transfer in','interest','dividend','tax refund','centrelink','ato refund','transfer credit'] },
 ];
 
 function categorise(merchant) {
@@ -612,53 +612,98 @@ function categorise(merchant) {
 
 // ─── CSV PARSER ───────────────────────────────────────────────────────────────
 function parseCSV(text) {
-  const lines = text.trim().split(/\r?\n/).filter(l => l.trim());
-  if (lines.length < 2) return [];
-  
-  // Detect header
-  const header = lines[0].toLowerCase();
+  const allLines = text.trim().split(/\r?\n/).filter(l => l.trim());
+  if (allLines.length < 2) return [];
+
+  // ── Suncorp detection ──
+  // Suncorp exports start with two metadata rows then go straight into data:
+  // "Account History for Account:","..."
+  // "206 items"
+  // "31/03/2026","VISA PURCHASE ...","-$44.58","$1,632.83"
+  const isSuncorp = allLines[0].toLowerCase().includes('account history') ||
+                    allLines[1].toLowerCase().includes('items');
+
+  if (isSuncorp) {
+    const rows = [];
+    // Skip the first two header/metadata lines, then parse each data row
+    for (let i = 2; i < allLines.length; i++) {
+      const cols = splitCSVLine(allLines[i]);
+      if (cols.length < 3) continue;
+
+      const date = cols[0]?.replace(/"/g,'').trim();
+      const rawDesc = cols[1]?.replace(/"/g,'').trim();
+      // Amount is col 2, balance is col 3 — strip $, commas, quotes
+      const rawAmt = cols[2]?.replace(/["$,]/g,'').trim();
+      const amount = parseFloat(rawAmt) || 0;
+
+      if (!date || !rawDesc || amount === 0) continue;
+
+      const parsedDate = parseDate(date);
+      if (!parsedDate) continue;
+
+      // Negative = debit (expense), positive = credit (income)
+      const isDebit = amount < 0;
+
+      // Clean up Suncorp's verbose descriptions:
+      // "VISA PURCHASE   COLES  4460 Casuarina    30/03 AU AUD" → "Coles 4460 Casuarina"
+      let merchant = rawDesc
+        .replace(/^(VISA PURCHASE|EFTPOS|DIRECT DEBIT|DIRECT CREDIT|TRANSFER CREDIT|TRANSFER DEBIT|BPAY|ATM WITHDRAWAL|INTERNET TRANSFER)\s*/i, '')
+        .replace(/\s+\d{2}\/\d{2}\s+(AU\s+)?AUD\s*$/i, '')
+        .replace(/\s+/g, ' ')
+        .trim();
+
+      rows.push({
+        id: Date.now() + '-' + i,
+        date: parsedDate,
+        merchant: cleanMerchant(merchant),
+        rawMerchant: rawDesc,
+        amount: parseFloat(Math.abs(amount).toFixed(2)),
+        category: categorise(merchant),
+        isDebit,
+        learned: !!DB.learned[merchant.toLowerCase()],
+      });
+    }
+    return rows.filter(r => r.isDebit);
+  }
+
+  // ── Generic / other banks ──
+  const header = allLines[0].toLowerCase();
   const rows = [];
-  
-  for (let i = 1; i < lines.length; i++) {
-    const cols = splitCSVLine(lines[i]);
+
+  for (let i = 1; i < allLines.length; i++) {
+    const cols = splitCSVLine(allLines[i]);
     if (cols.length < 2) continue;
-    
+
     let date = '', merchant = '', amount = 0, debit = true;
-    
-    // CommBank / generic: Date, Amount, Description
+
     if (header.includes('date') && (header.includes('amount') || header.includes('debit'))) {
       const hi = header.split(',').map(h => h.trim().replace(/"/g,''));
       const dateIdx = hi.findIndex(h => h.includes('date'));
       const descIdx = hi.findIndex(h => h.includes('description') || h.includes('narration') || h.includes('merchant') || h.includes('details') || h.includes('particulars') || h.includes('reference'));
-      const amtIdx = hi.findIndex(h => h.includes('amount') && !h.includes('balance'));
+      const amtIdx  = hi.findIndex(h => h.includes('amount') && !h.includes('balance'));
       const debitIdx = hi.findIndex(h => h.includes('debit'));
-      const creditIdx = hi.findIndex(h => h.includes('credit'));
 
       if (dateIdx >= 0) date = cols[dateIdx]?.replace(/"/g,'').trim();
-      if (descIdx >= 0) merchant = cols[descIdx]?.replace(/"/g,'').trim();
-      else merchant = cols[1]?.replace(/"/g,'').trim();
+      merchant = descIdx >= 0 ? cols[descIdx]?.replace(/"/g,'').trim() : cols[1]?.replace(/"/g,'').trim();
 
       if (debitIdx >= 0 && cols[debitIdx]?.replace(/"/g,'').trim()) {
         amount = Math.abs(parseFloat(cols[debitIdx].replace(/[",]/g,'')) || 0);
         debit = true;
       } else if (amtIdx >= 0) {
-        const raw = parseFloat(cols[amtIdx].replace(/[",]/g,'')) || 0;
+        const raw = parseFloat(cols[amtIdx].replace(/[",$]/g,'')) || 0;
         amount = Math.abs(raw);
         debit = raw < 0;
       }
     } else {
-      // Fallback: assume col 0=date, col 1=description, col 2 or 3=amount
       date = cols[0]?.replace(/"/g,'').trim();
       merchant = cols[1]?.replace(/"/g,'').trim();
-      const rawAmt = parseFloat((cols[2] || cols[3] || '0').replace(/[",]/g,'')) || 0;
+      const rawAmt = parseFloat((cols[2] || cols[3] || '0').replace(/[",$]/g,'')) || 0;
       amount = Math.abs(rawAmt);
       debit = rawAmt <= 0 || cols.length <= 3;
     }
 
     if (!merchant || amount === 0) continue;
-
-    // Parse date
-    let parsedDate = parseDate(date);
+    const parsedDate = parseDate(date);
     if (!parsedDate) continue;
 
     rows.push({
@@ -672,7 +717,7 @@ function parseCSV(text) {
       learned: !!DB.learned[merchant.toLowerCase()],
     });
   }
-  return rows.filter(r => r.isDebit); // only expenses
+  return rows.filter(r => r.isDebit);
 }
 
 function splitCSVLine(line) {
