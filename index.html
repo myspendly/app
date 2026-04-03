@@ -604,14 +604,37 @@
 <div class="page" id="page-analytics">
   <div class="page-header">
     <h1>Analytics</h1>
-    <p id="analyticsSubtitle">Financial breakdown</p>
+    <p id="analyticsSubtitle">All transaction history</p>
   </div>
 
   <div class="period-tabs" id="analyticsTabs">
-    <div class="period-tab active" onclick="setAnalyticsPeriod('3m',this)">3 months</div>
-    <div class="period-tab" onclick="setAnalyticsPeriod('6m',this)">6 months</div>
-    <div class="period-tab" onclick="setAnalyticsPeriod('12m',this)">12 months</div>
-    <div class="period-tab" onclick="setAnalyticsPeriod('all',this)">All</div>
+    <div class="period-tab" onclick="setAnalyticsPeriod('custom',this)">Custom</div>
+    <div class="period-tab" onclick="setAnalyticsPeriod('month',this)">Month</div>
+    <div class="period-tab" onclick="setAnalyticsPeriod('year',this)">Year</div>
+    <div class="period-tab active" onclick="setAnalyticsPeriod('all',this)">All time</div>
+  </div>
+
+  <div id="analyticsMonthPickerWrap" style="display:none; margin-bottom:14px; overflow-x:auto; -webkit-overflow-scrolling:touch;">
+    <div id="analyticsMonthPicker" style="display:flex; gap:8px; padding-bottom:4px;"></div>
+  </div>
+
+  <div id="analyticsCustomWrap" style="display:none; margin-bottom:14px; gap:10px; align-items:center;">
+    <div style="flex:1;">
+      <div style="font-size:11px; color:var(--text3); margin-bottom:4px; text-transform:uppercase; letter-spacing:0.05em;">From</div>
+      <input type="date" id="analyticsDateFrom" onchange="renderAnalytics()" style="
+        width:100%; padding:10px 12px; border-radius:var(--r);
+        background:var(--bg2); border:0.5px solid var(--border2);
+        color:var(--text); font-family:var(--font); font-size:14px; outline:none;
+      ">
+    </div>
+    <div style="flex:1;">
+      <div style="font-size:11px; color:var(--text3); margin-bottom:4px; text-transform:uppercase; letter-spacing:0.05em;">To</div>
+      <input type="date" id="analyticsDateTo" onchange="renderAnalytics()" style="
+        width:100%; padding:10px 12px; border-radius:var(--r);
+        background:var(--bg2); border:0.5px solid var(--border2);
+        color:var(--text); font-family:var(--font); font-size:14px; outline:none;
+      ">
+    </div>
   </div>
 
   <!-- Income vs Spending -->
@@ -649,7 +672,7 @@
 
   <!-- Spending by category pie -->
   <div class="card">
-    <div class="section-label" id="pieSectionLabel">Spending by category</div>
+    <div class="section-label" id="pieSectionLabel">Spending by category · all time</div>
     <div style="display:flex; align-items:center; gap:16px; flex-wrap:wrap;">
       <div style="position:relative; width:160px; height:160px; flex-shrink:0; margin: 0 auto;">
         <canvas id="pieChart"></canvas>
@@ -1114,11 +1137,11 @@ function getOrderedCatNames() {
   if (saved) {
     try {
       const order = JSON.parse(saved);
-      const all = CAT_NAMES.filter(n => !order.includes(n));
-      return [...order.filter(n => CAT_NAMES.includes(n)), ...all];
+      const all = getCatNames().filter(n => !order.includes(n));
+      return [...order.filter(n => getCatNames().includes(n)), ...all];
     } catch(e) {}
   }
-  return CAT_NAMES;
+  return getCatNames();
 }
 
 function saveCatOrder(order) {
@@ -1341,7 +1364,9 @@ const CATS = {
 // Apply any saved custom categories
 Object.entries(DB.customCats).forEach(([name, cat]) => { CATS[name] = cat; });
 
-const CAT_NAMES = Object.keys(CATS);
+// CAT_NAMES is now dynamic — always reflects current CATS
+function getCatNames() { return Object.keys(CATS); }
+const CAT_NAMES = getCatNames(); // kept for backwards compat but use getCatNames() going forward
 
 // ─── SMART AI CATEGORISER ─────────────────────────────────────────────────────
 const RULES = [
@@ -2325,6 +2350,7 @@ function addNewCategory() {
   emojiEl.value = '';
   renderCatMgmtList();
   renderCatOrderList();
+  renderDashboard();
   showToast(`✓ Added "${name}"`);
 }
 
@@ -2551,7 +2577,8 @@ function openTxnSheetFromCat(id) {
 }
 
 // ─── ANALYTICS ────────────────────────────────────────────────────────────────
-let analyticsPeriod = '3m';
+let analyticsPeriod = 'all';
+let analyticsSelectedMonth = null;
 let incomeSpendChartInst = null;
 let pieChartInst = null;
 let savingsTrendInst = null;
@@ -2560,20 +2587,111 @@ function setAnalyticsPeriod(p, btn) {
   analyticsPeriod = p;
   document.querySelectorAll('#analyticsTabs .period-tab').forEach(b => b.classList.remove('active'));
   btn.classList.add('active');
+
+  const monthWrap = document.getElementById('analyticsMonthPickerWrap');
+  const customWrap = document.getElementById('analyticsCustomWrap');
+
+  if (p === 'month') {
+    renderAnalyticsMonthPicker();
+    monthWrap.style.display = '';
+    customWrap.style.display = 'none';
+  } else if (p === 'custom') {
+    customWrap.style.display = 'flex';
+    monthWrap.style.display = 'none';
+    // Default to last 30 days if not set
+    if (!document.getElementById('analyticsDateFrom').value) {
+      const to = new Date();
+      const from = new Date(); from.setDate(to.getDate() - 30);
+      document.getElementById('analyticsDateFrom').value = from.toISOString().split('T')[0];
+      document.getElementById('analyticsDateTo').value = to.toISOString().split('T')[0];
+    }
+  } else {
+    monthWrap.style.display = 'none';
+    customWrap.style.display = 'none';
+  }
+
+  renderAnalytics();
+}
+
+function renderAnalyticsMonthPicker() {
+  const monthSet = new Set(DB.transactions.map(t => t.date.substring(0, 7)));
+  const months = [...monthSet].sort().reverse();
+  if (!analyticsSelectedMonth && months.length) analyticsSelectedMonth = months[0];
+
+  document.getElementById('analyticsMonthPicker').innerHTML = months.map(m => {
+    const [y, mo] = m.split('-');
+    const label = new Date(y, mo - 1).toLocaleString('default', { month: 'short', year: '2-digit' });
+    const isActive = m === analyticsSelectedMonth;
+    return `<div onclick="selectAnalyticsMonth('${m}')" style="
+      flex-shrink:0; padding:6px 14px; border-radius:20px; font-size:13px; font-weight:500;
+      cursor:pointer; white-space:nowrap;
+      background:${isActive ? 'var(--accent)' : 'var(--bg3)'};
+      color:${isActive ? '#0a0a0a' : 'var(--text2)'};
+      border:0.5px solid ${isActive ? 'var(--accent)' : 'var(--border)'};
+    ">${label}</div>`;
+  }).join('');
+}
+
+function selectAnalyticsMonth(m) {
+  analyticsSelectedMonth = m;
+  renderAnalyticsMonthPicker();
   renderAnalytics();
 }
 
 function getAnalyticsTxns() {
-  const now = new Date();
   const txns = DB.transactions;
-  if (analyticsPeriod === 'all') return txns;
-  const months = parseInt(analyticsPeriod);
-  const cutoff = new Date(now.getFullYear(), now.getMonth() - months, 1);
-  return txns.filter(t => new Date(t.date) >= cutoff);
+  const now = new Date();
+
+  if (analyticsPeriod === 'month' && analyticsSelectedMonth) {
+    const [y, mo] = analyticsSelectedMonth.split('-').map(Number);
+    return txns.filter(t => {
+      const d = new Date(t.date);
+      return d.getFullYear() === y && d.getMonth() === mo - 1;
+    });
+  }
+
+  if (analyticsPeriod === 'custom') {
+    const from = document.getElementById('analyticsDateFrom')?.value;
+    const to = document.getElementById('analyticsDateTo')?.value;
+    if (from && to) {
+      const fromD = new Date(from + 'T00:00:00');
+      const toD = new Date(to + 'T23:59:59');
+      return txns.filter(t => {
+        const d = new Date(t.date + 'T00:00:00');
+        return d >= fromD && d <= toD;
+      });
+    }
+  }
+
+  if (analyticsPeriod === 'year') {
+    const latestDate = txns.length ? new Date(txns.reduce((l, t) => t.date > l ? t.date : l, txns[0].date)) : now;
+    const ref = latestDate > now ? now : latestDate;
+    return txns.filter(t => new Date(t.date).getFullYear() === ref.getFullYear());
+  }
+
+  // All time
+  return txns;
 }
 
 function renderAnalytics() {
   if (!DB.transactions.length) return;
+
+  // Update subtitle
+  let subtitle = 'All transaction history';
+  if (analyticsPeriod === 'month' && analyticsSelectedMonth) {
+    const [y, mo] = analyticsSelectedMonth.split('-');
+    subtitle = new Date(y, mo - 1).toLocaleString('default', { month: 'long', year: 'numeric' });
+  } else if (analyticsPeriod === 'custom') {
+    const from = document.getElementById('analyticsDateFrom')?.value;
+    const to = document.getElementById('analyticsDateTo')?.value;
+    if (from && to) {
+      subtitle = `${new Date(from+'T00:00:00').toLocaleDateString('en-AU',{day:'numeric',month:'short',year:'numeric'})} – ${new Date(to+'T00:00:00').toLocaleDateString('en-AU',{day:'numeric',month:'short',year:'numeric'})}`;
+    }
+  } else if (analyticsPeriod === 'year') {
+    const now = new Date();
+    subtitle = `Year ${now.getFullYear()}`;
+  }
+  document.getElementById('analyticsSubtitle').textContent = subtitle;
 
   const txns = getAnalyticsTxns();
 
@@ -2642,8 +2760,8 @@ function renderAnalytics() {
   document.getElementById('a-savings-rate').style.color = savingsRate >= 0 ? '#c8f565' : '#ff6b6b';
 
   // ── Pie chart ──
-  const periodLabels = { '3m': 'last 3 months', '6m': 'last 6 months', '12m': 'last 12 months', 'all': 'all time' };
-  document.getElementById('pieSectionLabel').textContent = `Spending by category · ${periodLabels[analyticsPeriod]}`;
+  
+  document.getElementById('pieSectionLabel').textContent = `Spending by category · all time`;
 
   const catTotals = {};
   txns.filter(t => t.category !== 'Transfers' && t.category !== 'Income').forEach(t => {
