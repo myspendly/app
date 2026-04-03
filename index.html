@@ -1299,18 +1299,20 @@ document.addEventListener('touchstart', resetTimeoutTimer, { passive: true });
 document.addEventListener('click', resetTimeoutTimer);
 
 const DB = {
-  save() { localStorage.setItem('spendly_v1', JSON.stringify({ transactions: this.transactions, learned: this.learned, uploads: this.uploads })); },
+  save() { localStorage.setItem('spendly_v1', JSON.stringify({ transactions: this.transactions, learned: this.learned, uploads: this.uploads, customCats: this.customCats })); },
   load() {
     try {
       const d = JSON.parse(localStorage.getItem('spendly_v1') || '{}');
       this.transactions = d.transactions || [];
       this.learned = d.learned || {};
       this.uploads = d.uploads || [];
-    } catch(e) { this.transactions = []; this.learned = {}; this.uploads = []; }
+      this.customCats = d.customCats || {};
+    } catch(e) { this.transactions = []; this.learned = {}; this.uploads = []; this.customCats = {}; }
   },
   transactions: [],
   learned: {},
-  uploads: []
+  uploads: [],
+  customCats: {}
 };
 DB.load();
 
@@ -1335,6 +1337,10 @@ const CATS = {
   'Transfers':       { emoji: '🔄', color: '#64b5f6', dim: 'rgba(100,181,246,0.15)' },
   'Other':           { emoji: '📦', color: '#555', dim: 'rgba(85,85,85,0.15)' },
 };
+
+// Apply any saved custom categories
+Object.entries(DB.customCats).forEach(([name, cat]) => { CATS[name] = cat; });
+
 const CAT_NAMES = Object.keys(CATS);
 
 // ─── SMART AI CATEGORISER ─────────────────────────────────────────────────────
@@ -2266,17 +2272,14 @@ function renameCat(oldName, newName) {
   if (!newName || newName === oldName) return;
   if (CATS[newName]) { showToast('That name already exists'); return; }
 
-  // Update CATS
   CATS[newName] = { ...CATS[oldName] };
   delete CATS[oldName];
 
-  // Update all transactions
+  // Keep customCats in sync
+  if (DB.customCats[oldName]) { DB.customCats[newName] = CATS[newName]; delete DB.customCats[oldName]; }
+
   DB.transactions.forEach(t => { if (t.category === oldName) t.category = newName; });
-
-  // Update learned
   Object.keys(DB.learned).forEach(k => { if (DB.learned[k] === oldName) DB.learned[k] = newName; });
-
-  // Update cat order
   const order = getOrderedCatNames().map(n => n === oldName ? newName : n);
   saveCatOrder(order);
 
@@ -2291,6 +2294,7 @@ function renameCatEmoji(catName, newEmoji) {
   newEmoji = newEmoji.trim();
   if (!newEmoji || !CATS[catName]) return;
   CATS[catName].emoji = newEmoji;
+  if (DB.customCats[catName]) { DB.customCats[catName].emoji = newEmoji; DB.save(); }
   renderCatMgmtList();
   renderDashboard();
   showToast(`✓ Emoji updated`);
@@ -2305,10 +2309,12 @@ function addNewCategory() {
   if (!name) { showToast('Please enter a category name'); return; }
   if (CATS[name]) { showToast('Category already exists'); return; }
 
-  // Add to CATS
+  // Add to CATS and save persistently
   const colors = ['#80cbc4','#ffb74d','#f06292','#aed581','#7986cb','#4db6ac','#ff8a65'];
   const col = colors[Object.keys(CATS).length % colors.length];
   CATS[name] = { emoji, color: col, dim: col + '26' };
+  DB.customCats[name] = CATS[name];
+  DB.save();
 
   // Add to order
   const order = getOrderedCatNames();
@@ -2361,6 +2367,7 @@ function deleteCatAction(action) {
 
   // Remove the category
   delete CATS[name];
+  delete DB.customCats[name];
   const order = getOrderedCatNames().filter(n => n !== name);
   saveCatOrder(order);
   DB.save();
