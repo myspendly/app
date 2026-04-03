@@ -3,6 +3,9 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+<meta http-equiv="Pragma" content="no-cache">
+<meta http-equiv="Expires" content="0">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <meta name="apple-mobile-web-app-title" content="Spendly">
@@ -1133,13 +1136,6 @@ function showPage(name, btn) {
 // ─── PERIOD ───────────────────────────────────────────────────────────────────
 let currentPeriod = 'month';
 
-function setPeriod(p, btn) {
-  currentPeriod = p;
-  document.querySelectorAll('.period-tab').forEach(b => b.classList.remove('active'));
-  btn.classList.add('active');
-  renderDashboard();
-}
-
 let selectedMonth = null;
 let selectedWeekStart = null;
 
@@ -1725,6 +1721,20 @@ function renderSettings() {
   }).join('') + (learned.length > 20 ? `<div style="font-size:12px; color: var(--text3); padding-top: 8px;">+${learned.length-20} more</div>` : '');
 }
 
+function exportData() {
+  if (!DB.transactions.length) { showToast('No data to export'); return; }
+  const csv = ['Date,Merchant,Amount,Category']
+    .concat(DB.transactions.map(t => `${t.date},"${t.merchant}",${t.amount},"${t.category}"`))
+    .join('\n');
+  const blob = new Blob([csv], { type: 'text/csv' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url; a.download = `spendly-export-${new Date().toISOString().split('T')[0]}.csv`;
+  a.click();
+  URL.revokeObjectURL(url);
+  showToast('✓ Exported to CSV');
+}
+
 function exportFullBackup() {
   if (!DB.transactions.length) { showToast('No data to backup'); return; }
   const backup = {
@@ -1777,17 +1787,6 @@ function importFullBackup(event) {
     }
   };
   reader.readAsText(file);
-}
-  if (!DB.transactions.length) { showToast('No data to export'); return; }
-  const csv = ['Date,Merchant,Amount,Category']
-    .concat(DB.transactions.map(t => `${t.date},"${t.merchant}",${t.amount},"${t.category}"`))
-    .join('\n');
-  const blob = new Blob([csv], { type: 'text/csv' });
-  const url = URL.createObjectURL(blob);
-  const a = document.createElement('a');
-  a.href = url; a.download = `spendly-export-${new Date().toISOString().split('T')[0]}.csv`;
-  a.click();
-  showToast('✓ Exported to CSV');
 }
 
 function clearData() {
