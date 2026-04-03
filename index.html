@@ -670,6 +670,36 @@
       </div>
       <div class="settings-arrow">›</div>
     </div>
+    <div class="settings-row">
+      <div class="settings-icon">⏱️</div>
+      <div class="settings-info">
+        <div class="settings-title">Auto-lock timeout</div>
+        <div class="settings-sub">Lock app after inactivity</div>
+      </div>
+      <select id="timeoutSelect" onchange="saveTimeout(this.value)" style="
+        font-size:13px; padding:6px 10px; border-radius:10px;
+        background:var(--bg3); border:0.5px solid var(--border2);
+        color:var(--text); font-family:var(--font); cursor:pointer;
+      ">
+        <option value="0">Never</option>
+        <option value="1">1 min</option>
+        <option value="2" selected>2 mins</option>
+        <option value="5">5 mins</option>
+        <option value="10">10 mins</option>
+      </select>
+    </div>
+  </div>
+
+  <div class="card">
+    <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:12px;">
+      <div class="section-label" style="margin-bottom:0;">Category order</div>
+      <button id="catEditBtn" onclick="toggleCatEdit()" style="
+        font-size:13px; font-weight:500; padding:5px 14px; border-radius:10px;
+        border:0.5px solid var(--border2); background:var(--bg3);
+        color:var(--text2); font-family:var(--font); cursor:pointer;
+      ">Edit</button>
+    </div>
+    <div id="catOrderList"></div>
   </div>
 
   <div class="card">
@@ -955,6 +985,201 @@ function showSetPin() {
   document.getElementById('setPinScreen').style.display = 'flex';
 }
 
+// ─── CATEGORY ORDER ───────────────────────────────────────────────────────────
+const CAT_ORDER_KEY = 'spendly_cat_order';
+let catEditMode = false;
+let touchDragIdx = null;
+let touchDragEl = null;
+let touchStartY = 0;
+
+function getOrderedCatNames() {
+  const saved = localStorage.getItem(CAT_ORDER_KEY);
+  if (saved) {
+    try {
+      const order = JSON.parse(saved);
+      const all = CAT_NAMES.filter(n => !order.includes(n));
+      return [...order.filter(n => CAT_NAMES.includes(n)), ...all];
+    } catch(e) {}
+  }
+  return CAT_NAMES;
+}
+
+function saveCatOrder(order) {
+  localStorage.setItem(CAT_ORDER_KEY, JSON.stringify(order));
+}
+
+function toggleCatEdit() {
+  catEditMode = !catEditMode;
+  const btn = document.getElementById('catEditBtn');
+  if (btn) {
+    btn.textContent = catEditMode ? 'Done' : 'Edit';
+    btn.style.color = catEditMode ? '#c8f565' : 'var(--text2)';
+    btn.style.borderColor = catEditMode ? '#c8f565' : 'var(--border2)';
+  }
+  renderCatOrderList();
+}
+
+function renderCatOrderList() {
+  const ordered = getOrderedCatNames();
+  const el = document.getElementById('catOrderList');
+  if (!el) return;
+
+  if (!catEditMode) {
+    // View mode — just show the list
+    el.innerHTML = ordered.map(cat => {
+      const c = CATS[cat] || CATS['Other'];
+      return `<div class="settings-row" style="cursor:default;">
+        <div class="settings-icon" style="background:${c.dim}">${c.emoji}</div>
+        <div class="settings-info"><div class="settings-title">${cat}</div></div>
+      </div>`;
+    }).join('');
+    return;
+  }
+
+  // Edit mode — show drag handles with touch support
+  el.innerHTML = `
+    <div style="font-size:12px; color:var(--text2); margin-bottom:10px;">Hold and drag ☰ to reorder</div>
+    ${ordered.map((cat, i) => {
+      const c = CATS[cat] || CATS['Other'];
+      return `<div class="cat-order-row" id="catrow-${i}" data-idx="${i}" style="
+        display:flex; align-items:center; gap:12px; padding:10px 0;
+        border-bottom:0.5px solid var(--border); background:var(--bg2);
+        transition: opacity 0.15s;
+      ">
+        <div ontouchstart="touchDragStart(event,${i})" ontouchmove="touchDragMove(event)" ontouchend="touchDragEnd(event,${i})"
+          style="color:var(--text3); font-size:20px; padding:4px 8px; cursor:grab; user-select:none; -webkit-user-select:none; touch-action:none;">☰</div>
+        <div class="settings-icon" style="background:${c.dim}; flex-shrink:0;">${c.emoji}</div>
+        <div style="font-size:14px; font-weight:500; color:var(--text);">${cat}</div>
+        <div style="display:flex; gap:8px; margin-left:auto;">
+          <button onclick="moveCatUp(${i})" style="
+            width:30px; height:30px; border-radius:8px; border:0.5px solid var(--border2);
+            background:var(--bg3); color:var(--text2); font-size:14px; cursor:pointer;
+            display:flex; align-items:center; justify-content:center;
+          ">↑</button>
+          <button onclick="moveCatDown(${i})" style="
+            width:30px; height:30px; border-radius:8px; border:0.5px solid var(--border2);
+            background:var(--bg3); color:var(--text2); font-size:14px; cursor:pointer;
+            display:flex; align-items:center; justify-content:center;
+          ">↓</button>
+        </div>
+      </div>`;
+    }).join('')}
+  `;
+}
+
+function moveCatUp(i) {
+  if (i === 0) return;
+  const order = getOrderedCatNames();
+  [order[i-1], order[i]] = [order[i], order[i-1]];
+  saveCatOrder(order);
+  renderCatOrderList();
+  renderDashboard();
+}
+
+function moveCatDown(i) {
+  const order = getOrderedCatNames();
+  if (i >= order.length - 1) return;
+  [order[i], order[i+1]] = [order[i+1], order[i]];
+  saveCatOrder(order);
+  renderCatOrderList();
+  renderDashboard();
+}
+
+// Touch drag support
+function touchDragStart(e, i) {
+  touchDragIdx = i;
+  touchStartY = e.touches[0].clientY;
+  const row = document.getElementById(`catrow-${i}`);
+  if (row) row.style.opacity = '0.5';
+}
+
+function touchDragMove(e) {
+  e.preventDefault();
+  if (touchDragIdx === null) return;
+  const y = e.touches[0].clientY;
+  const rows = document.querySelectorAll('.cat-order-row');
+  rows.forEach((row, i) => {
+    const rect = row.getBoundingClientRect();
+    if (y >= rect.top && y <= rect.bottom && i !== touchDragIdx) {
+      row.style.borderTop = i < touchDragIdx ? '2px solid #c8f565' : '';
+      row.style.borderBottom = i > touchDragIdx ? '2px solid #c8f565' : '';
+    } else {
+      row.style.borderTop = '';
+      row.style.borderBottom = '';
+    }
+  });
+}
+
+function touchDragEnd(e, i) {
+  if (touchDragIdx === null) return;
+  const y = e.changedTouches[0].clientY;
+  const rows = document.querySelectorAll('.cat-order-row');
+  let dropIdx = touchDragIdx;
+  rows.forEach((row, idx) => {
+    const rect = row.getBoundingClientRect();
+    if (y >= rect.top && y <= rect.bottom) dropIdx = idx;
+    row.style.borderTop = '';
+    row.style.borderBottom = '';
+    row.style.opacity = '1';
+  });
+  if (dropIdx !== touchDragIdx) {
+    const order = getOrderedCatNames();
+    const moved = order.splice(touchDragIdx, 1)[0];
+    order.splice(dropIdx, 0, moved);
+    saveCatOrder(order);
+    renderDashboard();
+  }
+  touchDragIdx = null;
+  renderCatOrderList();
+}
+
+let dragCatIdx = null;
+function dragCatStart(e, i) { dragCatIdx = i; }
+function dragCatOver(e) { e.preventDefault(); }
+function dragCatDrop(e, i) {
+  e.preventDefault();
+  if (dragCatIdx === null || dragCatIdx === i) return;
+  const order = getOrderedCatNames();
+  const moved = order.splice(dragCatIdx, 1)[0];
+  order.splice(i, 0, moved);
+  saveCatOrder(order);
+  dragCatIdx = null;
+  renderCatOrderList();
+  renderDashboard();
+}
+
+// ─── AUTO-LOCK TIMEOUT ────────────────────────────────────────────────────────
+const TIMEOUT_KEY = 'spendly_timeout';
+let timeoutTimer = null;
+
+function saveTimeout(val) {
+  localStorage.setItem(TIMEOUT_KEY, val);
+  resetTimeoutTimer();
+  showToast(`✓ Auto-lock set to ${val === '0' ? 'never' : val + ' min' + (val === '1' ? '' : 's')}`);
+}
+
+function getTimeoutMins() {
+  return parseInt(localStorage.getItem(TIMEOUT_KEY) || '2');
+}
+
+function resetTimeoutTimer() {
+  if (timeoutTimer) clearTimeout(timeoutTimer);
+  const mins = getTimeoutMins();
+  if (mins === 0) return;
+  timeoutTimer = setTimeout(() => {
+    const hasPin = !!localStorage.getItem(PIN_KEY);
+    if (hasPin) {
+      pinEntry = '';
+      updatePinDots('', 'pinDots');
+      document.getElementById('pinError').textContent = '';
+      document.getElementById('pinPrompt').textContent = 'Enter your PIN';
+      document.getElementById('pinLock').style.display = 'flex';
+    }
+  }, mins * 60 * 1000);
+}
+
+document.addEventListener('touchstart', resetTimeoutTimer, { passive: true });
+document.addEventListener('click', resetTimeoutTimer);
 
 const DB = {
   save() { localStorage.setItem('spendly_v1', JSON.stringify({ transactions: this.transactions, learned: this.learned, uploads: this.uploads })); },
@@ -1759,16 +1984,20 @@ function openTxnSheet(id) {
   const c = CATS[t.category] || CATS['Other'];
 
   document.getElementById('sheetMerchant').textContent = t.merchant;
-  document.getElementById('sheetAmount').textContent = `-${fmt(t.amount)}`;
+  // Fix 1: show + for credits, - for debits
+  document.getElementById('sheetAmount').textContent = `${t.isDebit ? '-' : '+'}${fmt(t.amount)}`;
+  document.getElementById('sheetAmount').style.color = t.isDebit ? 'var(--text)' : '#c8f565';
   document.getElementById('sheetDate').textContent = formatDate(t.date);
   document.getElementById('sheetIconWrap').style.background = c.dim;
   document.getElementById('sheetIconWrap').textContent = c.emoji;
   document.getElementById('sheetLearnNote').textContent = t.learned ? '✦ You taught me this category' : 'Change the category to teach the app';
 
   const sel = document.getElementById('sheetCatSelect');
-  sel.innerHTML = CAT_NAMES.map(n => `<option value="${n}"${n===t.category?' selected':''}>${CATS[n].emoji} ${n}</option>`).join('');
+  sel.innerHTML = getOrderedCatNames().map(n => `<option value="${n}"${n===t.category?' selected':''}>${CATS[n].emoji} ${n}</option>`).join('');
 
   document.getElementById('txnSheet').classList.add('open');
+  // Fix 2: scroll sheet to top
+  setTimeout(() => { document.querySelector('#txnSheet .sheet').scrollTop = 0; }, 50);
 }
 
 function closeTxnSheet(e) {
@@ -1916,6 +2145,13 @@ function renderSettings() {
   const hasPin = !!localStorage.getItem(PIN_KEY);
   const pinStatusEl = document.getElementById('pinStatus');
   if (pinStatusEl) pinStatusEl.textContent = hasPin ? 'PIN is set ✓ — tap to change' : 'Set a 4-digit PIN to lock the app';
+
+  // Set timeout dropdown to saved value
+  const timeoutSel = document.getElementById('timeoutSelect');
+  if (timeoutSel) timeoutSel.value = getTimeoutMins().toString();
+
+  renderCatOrderList();
+
   const learned = Object.entries(DB.learned);
 
   if (!learned.length) {
@@ -2054,6 +2290,8 @@ function openCatSheet(cat) {
   : `<div style="text-align:center; padding: 30px 0; font-size:13px; color:var(--text2);">No transactions in this period</div>`;
 
   document.getElementById('catSheet').classList.add('open');
+  // Fix 2: always scroll to top when opening
+  setTimeout(() => { document.querySelector('#catSheet .sheet').scrollTop = 0; }, 50);
 }
 
 function closeCatSheet(e) {
@@ -2247,6 +2485,7 @@ renderTransactions();
 renderInsights();
 renderUploadHistory();
 initLock();
+resetTimeoutTimer();
 
 // ─── SERVICE WORKER ───────────────────────────────────────────────────────────
 if ('serviceWorker' in navigator) {
