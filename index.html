@@ -1686,6 +1686,19 @@ const CATS = {
 // Apply any saved custom categories
 Object.entries(DB.customCats).forEach(([name, cat]) => { CATS[name] = cat; });
 
+// Safety net — rebuild any categories found in transactions but missing from CATS
+// This recovers categories like Fuel that may have been lost
+const colors = ['#80cbc4','#ffb74d','#f06292','#aed581','#7986cb','#4db6ac','#ff8a65'];
+DB.transactions.forEach(t => {
+  if (t.category && !CATS[t.category]) {
+    const col = colors[Object.keys(CATS).length % colors.length];
+    CATS[t.category] = { emoji: '📁', color: col, dim: col + '26' };
+    // Also save it to customCats so it persists
+    DB.customCats[t.category] = CATS[t.category];
+  }
+});
+DB.save();
+
 // CAT_NAMES is now dynamic — always reflects current CATS
 function getCatNames() { return Object.keys(CATS); }
 const CAT_NAMES = getCatNames(); // kept for backwards compat but use getCatNames() going forward
