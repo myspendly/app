@@ -869,6 +869,26 @@
   </div>
 
   <div class="card">
+    <div class="section-label">Features</div>
+    <div class="settings-row" onclick="openMortgageEditor()">
+      <div class="settings-icon">🏠</div>
+      <div class="settings-info">
+        <div class="settings-title">Property tab</div>
+        <div class="settings-sub" id="propertyTabStatus">Disabled — tap to enable</div>
+      </div>
+      <div id="propertyToggle" onclick="event.stopPropagation(); togglePropertyTab()" style="
+        width:44px; height:26px; border-radius:13px; background:var(--bg3);
+        border:0.5px solid var(--border2); position:relative; cursor:pointer; transition:background 0.2s; flex-shrink:0;
+      ">
+        <div id="propertyToggleKnob" style="
+          width:20px; height:20px; border-radius:50%; background:#888;
+          position:absolute; top:3px; left:3px; transition:left 0.2s, background 0.2s;
+        "></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="card">
     <div class="section-label">Danger zone</div>
     <div class="settings-row" onclick="clearData()">
       <div class="settings-icon">🗑️</div>
@@ -985,7 +1005,7 @@
 </div>
 
 <!-- BOTTOM NAV -->
-<nav class="nav">
+<nav class="nav" id="mainNav">
   <button class="nav-btn active" onclick="showPage('dashboard',this)">
     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/></svg>
     <span>Overview</span>
@@ -1002,11 +1022,146 @@
     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>
     <span>Analytics</span>
   </button>
+  <button class="nav-btn" id="propertyNavBtn" onclick="showPage('property',this)" style="display:none;">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg>
+    <span>Property</span>
+  </button>
   <button class="nav-btn" onclick="showPage('settings',this)">
     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="12" cy="12" r="3"/><path d="M12 1v2M12 21v2M4.22 4.22l1.42 1.42M18.36 18.36l1.42 1.42M1 12h2M21 12h2M4.22 19.78l1.42-1.42M18.36 5.64l1.42-1.42"/></svg>
     <span>Settings</span>
   </button>
 </nav>
+
+<!-- PROPERTY PAGE -->
+<div class="page" id="page-property">
+  <div class="page-header">
+    <h1>Property</h1>
+    <p id="propertySubtitle">Your mortgage & home costs</p>
+  </div>
+
+  <!-- Mortgage Overview Card -->
+  <div class="card" style="margin-bottom:16px;">
+    <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:16px;">
+      <div class="section-label" style="margin-bottom:0;">Mortgage</div>
+      <button onclick="openMortgageEditor()" style="
+        font-size:13px; font-weight:500; padding:5px 14px; border-radius:10px;
+        border:0.5px solid var(--border2); background:var(--bg3);
+        color:var(--text2); font-family:var(--font); cursor:pointer;
+      ">Edit</button>
+    </div>
+
+    <div id="mortgageSummary">
+      <div style="text-align:center; padding:20px 0; color:var(--text2); font-size:14px;">
+        Tap Edit to enter your mortgage details
+      </div>
+    </div>
+  </div>
+
+  <!-- Offset Benefit Card -->
+  <div class="card" id="offsetCard" style="display:none; margin-bottom:16px;">
+    <div class="section-label">Offset benefit</div>
+    <div id="offsetSummary"></div>
+  </div>
+
+  <!-- Financial Health -->
+  <div class="card" id="financialHealthCard" style="margin-bottom:16px;">
+    <div class="section-label">Financial health</div>
+    <div id="financialHealthContent"></div>
+  </div>
+
+  <!-- House Costs This Month -->
+  <div class="card">
+    <div class="section-label" id="houseCostsLabel">House costs this month</div>
+    <div id="houseCostsList"></div>
+  </div>
+</div>
+
+<!-- MORTGAGE EDITOR SHEET -->
+<div class="sheet-overlay" id="mortgageSheet" onclick="closeMortgageEditor(event)">
+  <div class="sheet" style="max-height:92vh;">
+    <div class="sheet-handle"></div>
+    <div style="display:flex; align-items:center; gap:12px; margin-bottom:20px;">
+      <button onclick="closeMortgageEditor()" style="
+        width:36px; height:36px; border-radius:50%; border:0.5px solid var(--border2);
+        background:var(--bg3); color:var(--text2); font-size:18px; cursor:pointer;
+        display:flex; align-items:center; justify-content:center; flex-shrink:0;
+      ">‹</button>
+      <div class="sheet-title" style="margin-bottom:0;">Mortgage details</div>
+      <button onclick="saveMortgage()" style="
+        margin-left:auto; padding:6px 16px; border-radius:10px; border:none;
+        background:var(--accent); color:#0a0a0a; font-family:var(--font);
+        font-size:13px; font-weight:600; cursor:pointer; flex-shrink:0;
+      ">Save</button>
+    </div>
+
+    <div class="field-label">Loan balance</div>
+    <div style="position:relative; margin-bottom:16px;">
+      <span style="position:absolute; left:14px; top:50%; transform:translateY(-50%); color:var(--text2); font-size:15px;">$</span>
+      <input id="m-balance" type="text" inputmode="decimal" placeholder="0.00" style="
+        width:100%; padding:13px 14px 13px 28px; border-radius:var(--r);
+        background:var(--bg3); border:0.5px solid var(--border2);
+        color:var(--text); font-family:var(--font); font-size:15px; outline:none; box-sizing:border-box;
+      ">
+    </div>
+
+    <div class="field-label">Offset account balance</div>
+    <div style="position:relative; margin-bottom:16px;">
+      <span style="position:absolute; left:14px; top:50%; transform:translateY(-50%); color:var(--text2); font-size:15px;">$</span>
+      <input id="m-offset" type="text" inputmode="decimal" placeholder="0.00" style="
+        width:100%; padding:13px 14px 13px 28px; border-radius:var(--r);
+        background:var(--bg3); border:0.5px solid var(--border2);
+        color:var(--text); font-family:var(--font); font-size:15px; outline:none; box-sizing:border-box;
+      ">
+    </div>
+
+    <div class="field-label">Interest rate (%)</div>
+    <div style="position:relative; margin-bottom:16px;">
+      <input id="m-rate" type="text" inputmode="decimal" placeholder="6.00" style="
+        width:100%; padding:13px 14px; border-radius:var(--r);
+        background:var(--bg3); border:0.5px solid var(--border2);
+        color:var(--text); font-family:var(--font); font-size:15px; outline:none; box-sizing:border-box;
+      ">
+    </div>
+
+    <div class="field-label">Monthly repayment</div>
+    <div style="position:relative; margin-bottom:16px;">
+      <span style="position:absolute; left:14px; top:50%; transform:translateY(-50%); color:var(--text2); font-size:15px;">$</span>
+      <input id="m-repayment" type="text" inputmode="decimal" placeholder="0.00" style="
+        width:100%; padding:13px 14px 13px 28px; border-radius:var(--r);
+        background:var(--bg3); border:0.5px solid var(--border2);
+        color:var(--text); font-family:var(--font); font-size:15px; outline:none; box-sizing:border-box;
+      ">
+    </div>
+
+    <div class="field-label">Loan start date</div>
+    <input id="m-startdate" type="date" style="
+      width:100%; padding:13px 14px; border-radius:var(--r); margin-bottom:16px;
+      background:var(--bg3); border:0.5px solid var(--border2);
+      color:var(--text); font-family:var(--font); font-size:15px; outline:none; box-sizing:border-box;
+    ">
+
+    <div class="field-label">Loan term (years)</div>
+    <input id="m-term" type="text" inputmode="numeric" placeholder="30" style="
+      width:100%; padding:13px 14px; border-radius:var(--r); margin-bottom:24px;
+      background:var(--bg3); border:0.5px solid var(--border2);
+      color:var(--text); font-family:var(--font); font-size:15px; outline:none; box-sizing:border-box;
+    ">
+
+    <button onclick="saveMortgage()" style="
+      width:100%; padding:16px; border-radius:var(--r); border:none;
+      background:var(--accent); color:#0a0a0a; font-family:var(--font);
+      font-size:16px; font-weight:600; cursor:pointer; margin-bottom:12px;
+    ">Save</button>
+
+    <button onclick="disableProperty()" style="
+      width:100%; padding:12px; border-radius:var(--r); border:0.5px solid rgba(255,107,107,0.3);
+      background:transparent; color:#ff6b6b; font-family:var(--font);
+      font-size:14px; cursor:pointer;
+    ">Disable Property tab</button>
+
+    <div style="height:8px;"></div>
+  </div>
+</div>
 
 <!-- TRANSACTION DETAIL SHEET -->
 <div class="sheet-overlay" id="txnSheet" onclick="closeTxnSheet(event)">
@@ -1486,6 +1641,10 @@ const CATS = {
   'Personal care':   { emoji: '💆', color: '#f06292', dim: 'rgba(240,98,146,0.15)' },
   'ARC Costs':       { emoji: '🏗️', color: '#80cbc4', dim: 'rgba(128,203,196,0.15)' },
   'Income':          { emoji: '💰', color: '#c8f565', dim: 'rgba(200,245,101,0.15)' },
+  'Rates':           { emoji: '🏛️', color: '#8d6e63', dim: 'rgba(141,110,99,0.15)' },
+  'Home insurance':  { emoji: '🛡️', color: '#5c6bc0', dim: 'rgba(92,107,192,0.15)' },
+  'Home maintenance':{ emoji: '🔧', color: '#ef6c00', dim: 'rgba(239,108,0,0.15)' },
+  'Body corporate':  { emoji: '🏢', color: '#00897b', dim: 'rgba(0,137,123,0.15)' },
   'Transfers':       { emoji: '🔄', color: '#64b5f6', dim: 'rgba(100,181,246,0.15)' },
   'Other':           { emoji: '📦', color: '#555', dim: 'rgba(85,85,85,0.15)' },
 };
@@ -1503,6 +1662,10 @@ const RULES = [
   { cat: 'Rent', kw: ['rent','rental','real estate','ray white','lj hooker','raine & horne','century 21','property manager','harcourts','mcgrath','first national','landlord'] },
   { cat: 'Electricity', kw: ['origin energy','agl','alinta','energyaust','ausgrid','jemena','synergy','actew','powershop','ergon','endeavour energy','essential energy','powerwater','aurora energy','electricity','power bill'] },
   { cat: 'Internet & phone', kw: ['telstra','optus','vodafone','tpg','belong','aussie broadband','superloop','iinet','internode','dodo','amaysim','boost mobile','kogan mobile','aldi mobile','catch connect','internet','broadband','mobile plan'] },
+  { cat: 'Rates', kw: ['council rates','land rates','water rates','shire rates','city council','shire council','council charge','local government','water corporation','urban utilities','sa water','icon water','sydney water','yarra valley water','melbourne water','rates notice'] },
+  { cat: 'Home insurance', kw: ['home insurance','house insurance','building insurance','contents insurance','landlord insurance','strata insurance','home and contents'] },
+  { cat: 'Home maintenance', kw: ['plumber','electrician','handyman','hardware','bunnings','mitre 10','total tools','roofing','pest control','lawn','garden','cleaning service','locksmith','air conditioning service','pool service'] },
+  { cat: 'Body corporate', kw: ['body corporate','strata levy','owners corporation','strata management','body corp','bc levy','strata fee'] },
   { cat: 'Insurance', kw: ['insurance','nrma','racq','racv','rac ','budget direct','real insurance','youi','aami','allianz','qbe','suncorp insur','bupa','medibank','hbf','ahm','nib','cgu','gi policy'] },
   { cat: 'Groceries', kw: ['woolworths','coles','aldi','iga','foodland','harris farm','costco','fruit','butcher','bakery','supermarket','fresh'] },
   { cat: 'Dining out', kw: ['mcdonald','hungry jack','kfc','subway','domino','pizza','grill\'d','nando','uber eat','deliveroo','doordash','menulog','cafe','restaurant','bar ','bistro','thai','sushi','ramen','burger','burrito','kebab','chinese','indian','italian','japanese','korean','osushi','crosseyed','espresso','kooco','balter','barefoot','zam '] },
@@ -1840,9 +2003,10 @@ function showPage(name, btn) {
   document.querySelectorAll('.nav-btn').forEach(b => b.classList.remove('active'));
   document.getElementById('page-' + name).classList.add('active');
   if (btn) btn.classList.add('active');
-  if (name === 'settings') renderSettings();
+  if (name === 'settings') { renderSettings(); renderPropertySettings(); }
   if (name === 'analytics') setTimeout(renderAnalytics, 50);
   if (name === 'dashboard') restorePeriodState();
+  if (name === 'property') renderPropertyPage();
 }
 
 function openSheet(id) {
@@ -2637,6 +2801,298 @@ function importFullBackup(event) {
   reader.readAsText(file);
 }
 
+// ─── PROPERTY TAB ─────────────────────────────────────────────────────────────
+const PROPERTY_KEY = 'spendly_property';
+const PROPERTY_CATS = ['Rates', 'Home insurance', 'Home maintenance', 'Body corporate'];
+
+function loadMortgage() {
+  try { return JSON.parse(localStorage.getItem(PROPERTY_KEY) || 'null'); } catch(e) { return null; }
+}
+
+function saveMortgageData(data) {
+  localStorage.setItem(PROPERTY_KEY, JSON.stringify(data));
+}
+
+function isPropertyEnabled() {
+  const m = loadMortgage();
+  return m && m.enabled;
+}
+
+function togglePropertyTab() {
+  const m = loadMortgage() || {};
+  m.enabled = !m.enabled;
+  saveMortgageData(m);
+  updatePropertyNav();
+  renderPropertySettings();
+  showToast(m.enabled ? '✓ Property tab enabled' : 'Property tab hidden');
+}
+
+function disableProperty() {
+  const m = loadMortgage() || {};
+  m.enabled = false;
+  saveMortgageData(m);
+  updatePropertyNav();
+  closeMortgageEditor();
+  showPage('dashboard', document.querySelector('.nav-btn'));
+  renderPropertySettings();
+  showToast('Property tab hidden');
+}
+
+function updatePropertyNav() {
+  const btn = document.getElementById('propertyNavBtn');
+  if (btn) btn.style.display = isPropertyEnabled() ? '' : 'none';
+}
+
+function openMortgageEditor() {
+  // Auto-enable property if opening editor for first time
+  const m = loadMortgage() || {};
+  if (!m.enabled) {
+    m.enabled = true;
+    saveMortgageData(m);
+    updatePropertyNav();
+    renderPropertySettings();
+  }
+  document.getElementById('m-balance').value   = m.balance   ? Number(m.balance).toLocaleString('en-AU', {minimumFractionDigits:2, maximumFractionDigits:2})   : '';
+  document.getElementById('m-offset').value    = m.offset    ? Number(m.offset).toLocaleString('en-AU', {minimumFractionDigits:2, maximumFractionDigits:2})    : '';
+  document.getElementById('m-rate').value      = m.rate      ? m.rate.toString()      : '';
+  document.getElementById('m-repayment').value = m.repayment ? Number(m.repayment).toLocaleString('en-AU', {minimumFractionDigits:2, maximumFractionDigits:2}) : '';
+  document.getElementById('m-startdate').value = m.startDate || '';
+  document.getElementById('m-term').value      = m.term      || '30';
+  openSheet('mortgageSheet');
+  setTimeout(() => { document.querySelector('#mortgageSheet .sheet').scrollTop = 0; }, 50);
+}
+
+function closeMortgageEditor(e) {
+  if (!e || e.target === document.getElementById('mortgageSheet')) {
+    closeSheet('mortgageSheet');
+    renderPropertyPage();
+  }
+}
+
+function saveMortgage() {
+  const m = loadMortgage() || {};
+  m.enabled   = true;
+  m.balance   = parseFloat(document.getElementById('m-balance').value.replace(/,/g, ''))   || 0;
+  m.offset    = parseFloat(document.getElementById('m-offset').value.replace(/,/g, ''))    || 0;
+  m.rate      = parseFloat(document.getElementById('m-rate').value.replace(/,/g, ''))      || 0;
+  m.repayment = parseFloat(document.getElementById('m-repayment').value.replace(/,/g, '')) || 0;
+  m.startDate = document.getElementById('m-startdate').value;
+  m.term      = parseInt(document.getElementById('m-term').value)        || 30;
+  saveMortgageData(m);
+  closeSheet('mortgageSheet');
+  renderPropertyPage();
+  showToast('✓ Mortgage saved');
+}
+
+function renderPropertyPage() {
+  const m = loadMortgage();
+  if (!m || !m.balance) {
+    document.getElementById('mortgageSummary').innerHTML = `
+      <div style="text-align:center; padding:20px 0; color:var(--text2); font-size:14px;">
+        Tap Edit to enter your mortgage details
+      </div>`;
+    document.getElementById('offsetCard').style.display = 'none';
+    renderHouseCosts();
+    renderFinancialHealth(m);
+    return;
+  }
+
+  const effective = Math.max(0, m.balance - (m.offset || 0));
+  const monthlyRate = m.rate / 100 / 12;
+  const monthlyInterest = effective * monthlyRate;
+  const monthlyPrincipal = Math.max(0, m.repayment - monthlyInterest);
+
+  // Years remaining
+  let yearsRemaining = '—';
+  if (m.repayment > monthlyInterest && effective > 0) {
+    const months = Math.log(m.repayment / (m.repayment - effective * monthlyRate)) / Math.log(1 + monthlyRate);
+    yearsRemaining = isFinite(months) ? `${Math.ceil(months / 12)} yrs` : '—';
+  }
+
+  // Offset saving
+  const interestWithoutOffset = m.balance * monthlyRate;
+  const offsetSavingMonthly = interestWithoutOffset - monthlyInterest;
+  const offsetSavingYearly = offsetSavingMonthly * 12;
+
+  document.getElementById('mortgageSummary').innerHTML = `
+    <div style="display:grid; grid-template-columns:1fr 1fr; gap:12px; margin-bottom:16px;">
+      <div style="background:var(--bg3); border-radius:12px; padding:14px;">
+        <div style="font-size:11px; color:var(--text3); text-transform:uppercase; letter-spacing:0.05em; margin-bottom:4px;">Loan balance</div>
+        <div style="font-size:20px; font-weight:600; color:var(--text);">${fmt(m.balance)}</div>
+      </div>
+      <div style="background:var(--bg3); border-radius:12px; padding:14px;">
+        <div style="font-size:11px; color:var(--text3); text-transform:uppercase; letter-spacing:0.05em; margin-bottom:4px;">Effective balance</div>
+        <div style="font-size:20px; font-weight:600; color:#c8f565;">${fmt(effective)}</div>
+      </div>
+      <div style="background:var(--bg3); border-radius:12px; padding:14px;">
+        <div style="font-size:11px; color:var(--text3); text-transform:uppercase; letter-spacing:0.05em; margin-bottom:4px;">Monthly interest</div>
+        <div style="font-size:20px; font-weight:600; color:#ff6b6b;">${fmt(monthlyInterest)}</div>
+      </div>
+      <div style="background:var(--bg3); border-radius:12px; padding:14px;">
+        <div style="font-size:11px; color:var(--text3); text-transform:uppercase; letter-spacing:0.05em; margin-bottom:4px;">Monthly principal</div>
+        <div style="font-size:20px; font-weight:600; color:#c8f565;">${fmt(monthlyPrincipal)}</div>
+      </div>
+    </div>
+    <div style="display:flex; justify-content:space-between; padding:12px 14px; background:var(--bg3); border-radius:12px; margin-bottom:4px;">
+      <span style="font-size:14px; color:var(--text2);">Interest rate</span>
+      <span style="font-size:14px; font-weight:600; color:var(--text);">${m.rate}%</span>
+    </div>
+    <div style="display:flex; justify-content:space-between; padding:12px 14px; background:var(--bg3); border-radius:12px; margin-bottom:4px;">
+      <span style="font-size:14px; color:var(--text2);">Monthly repayment</span>
+      <span style="font-size:14px; font-weight:600; color:var(--text);">${fmt(m.repayment)}</span>
+    </div>
+    <div style="display:flex; justify-content:space-between; padding:12px 14px; background:var(--bg3); border-radius:12px;">
+      <span style="font-size:14px; color:var(--text2);">Years remaining</span>
+      <span style="font-size:14px; font-weight:600; color:var(--text);">${yearsRemaining}</span>
+    </div>
+  `;
+
+  // Offset card
+  if (m.offset > 0) {
+    document.getElementById('offsetCard').style.display = '';
+    document.getElementById('offsetSummary').innerHTML = `
+      <div style="display:flex; justify-content:space-between; padding:10px 0; border-bottom:0.5px solid var(--border);">
+        <span style="font-size:14px; color:var(--text2);">Offset balance</span>
+        <span style="font-size:14px; font-weight:600; color:var(--text);">${fmt(m.offset)}</span>
+      </div>
+      <div style="display:flex; justify-content:space-between; padding:10px 0; border-bottom:0.5px solid var(--border);">
+        <span style="font-size:14px; color:var(--text2);">Saving per month</span>
+        <span style="font-size:14px; font-weight:600; color:#c8f565;">${fmt(offsetSavingMonthly)}</span>
+      </div>
+      <div style="display:flex; justify-content:space-between; padding:10px 0;">
+        <span style="font-size:14px; color:var(--text2);">Saving per year</span>
+        <span style="font-size:14px; font-weight:600; color:#c8f565;">${fmt(offsetSavingYearly)}</span>
+      </div>
+    `;
+  } else {
+    document.getElementById('offsetCard').style.display = 'none';
+  }
+
+  renderHouseCosts();
+  renderFinancialHealth(m);
+}
+
+function renderFinancialHealth(m) {
+  const el = document.getElementById('financialHealthContent');
+  if (!el) return;
+
+  if (!m || !m.repayment) {
+    el.innerHTML = `<div style="font-size:13px; color:var(--text2); padding:8px 0;">Enter your mortgage details above to see your financial health.</div>`;
+    return;
+  }
+
+  // ── All-time averages ──
+  const allMonthMap = {};
+  DB.transactions.forEach(t => {
+    if (t.category === 'Transfers') return;
+    const key = t.date.substring(0, 7);
+    if (!allMonthMap[key]) allMonthMap[key] = { income: 0, spend: 0 };
+    if (t.category === 'Income') allMonthMap[key].income += t.amount;
+    else allMonthMap[key].spend += t.isDebit ? t.amount : -t.amount;
+  });
+  const allMonths = Object.keys(allMonthMap);
+  const n = allMonths.length || 1;
+  const avgIncome  = allMonths.reduce((s, k) => s + allMonthMap[k].income, 0) / n;
+  const avgSpend   = allMonths.reduce((s, k) => s + allMonthMap[k].spend,  0) / n;
+  const avgLeft    = avgIncome - m.repayment - avgSpend;
+
+  // ── This month ──
+  const now = new Date();
+  const thisKey = `${now.getFullYear()}-${String(now.getMonth()+1).padStart(2,'0')}`;
+  // Use latest month that has data if current month not uploaded yet
+  const latestKey = allMonths.sort().reverse()[0] || thisKey;
+  const useKey = allMonthMap[thisKey] ? thisKey : latestKey;
+  const thisMonthData = allMonthMap[useKey] || { income: 0, spend: 0 };
+  const thisIncome = thisMonthData.income;
+  const thisSpend  = thisMonthData.spend;
+  const thisLeft   = thisIncome - m.repayment - thisSpend;
+
+  const monthLabel = useKey ? new Date(useKey + '-01').toLocaleString('default', { month: 'long', year: 'numeric' }) : 'This month';
+
+  function healthRow(label, income, spend, repayment, leftover) {
+    const isOk = leftover >= 0;
+    const colour = leftover > 500 ? '#c8f565' : leftover >= 0 ? '#ffb74d' : '#ff6b6b';
+    const icon = leftover > 500 ? '✅' : leftover >= 0 ? '⚠️' : '❌';
+    return `
+      <div style="background:var(--bg3); border-radius:14px; padding:14px; margin-bottom:10px;">
+        <div style="font-size:12px; font-weight:600; color:var(--text3); text-transform:uppercase; letter-spacing:0.05em; margin-bottom:10px;">${label}</div>
+        <div style="display:flex; justify-content:space-between; padding:6px 0; border-bottom:0.5px solid var(--border);">
+          <span style="font-size:14px; color:var(--text2);">Income</span>
+          <span style="font-size:14px; font-weight:500; color:#c8f565;">+${fmt(income)}</span>
+        </div>
+        <div style="display:flex; justify-content:space-between; padding:6px 0; border-bottom:0.5px solid var(--border);">
+          <span style="font-size:14px; color:var(--text2);">Mortgage</span>
+          <span style="font-size:14px; font-weight:500; color:#ff6b6b;">-${fmt(repayment)}</span>
+        </div>
+        <div style="display:flex; justify-content:space-between; padding:6px 0; border-bottom:0.5px solid var(--border);">
+          <span style="font-size:14px; color:var(--text2);">Spending</span>
+          <span style="font-size:14px; font-weight:500; color:var(--text);">-${fmt(spend)}</span>
+        </div>
+        <div style="display:flex; justify-content:space-between; align-items:center; padding:8px 0; margin-top:2px;">
+          <span style="font-size:15px; font-weight:700; color:var(--text);">Left over ${icon}</span>
+          <span style="font-size:18px; font-weight:700; color:${colour};">${leftover >= 0 ? '+' : '-'}${fmt(Math.abs(leftover))}</span>
+        </div>
+      </div>`;
+  }
+
+  el.innerHTML =
+    healthRow(monthLabel, thisIncome, thisSpend, m.repayment, thisLeft) +
+    healthRow('All-time monthly average', avgIncome, avgSpend, m.repayment, avgLeft);
+}
+
+function renderHouseCosts() {
+  const now = new Date();
+  const txns = DB.transactions.filter(t => {
+    const d = new Date(t.date);
+    return PROPERTY_CATS.includes(t.category) &&
+      d.getMonth() === now.getMonth() &&
+      d.getFullYear() === now.getFullYear();
+  });
+
+  const label = now.toLocaleString('default', { month: 'long', year: 'numeric' });
+  document.getElementById('houseCostsLabel').textContent = `House costs · ${label}`;
+
+  if (!txns.length) {
+    document.getElementById('houseCostsList').innerHTML = `
+      <div style="text-align:center; padding:20px 0; font-size:13px; color:var(--text2);">
+        No property transactions this month.<br>Upload your ING statement to see them here.
+      </div>`;
+    return;
+  }
+
+  const total = txns.reduce((s, t) => s + (t.isDebit ? t.amount : -t.amount), 0);
+  let html = txns.map(t => {
+    const c = CATS[t.category] || CATS['Other'];
+    return `<div class="txn-item" onclick="openTxnSheet('${t.id}')">
+      <div class="txn-icon" style="background:${c.dim}">${c.emoji}</div>
+      <div class="txn-info">
+        <div class="txn-merchant">${t.merchant}</div>
+        <div class="txn-meta">${t.category} · ${formatDate(t.date)}</div>
+      </div>
+      <div class="txn-right">
+        <div class="txn-amount" style="color:${t.isDebit ? 'var(--text)' : '#c8f565'}">${t.isDebit ? '-' : '+'}${fmt(t.amount)}</div>
+      </div>
+    </div>`;
+  }).join('');
+
+  html += `<div style="display:flex; justify-content:space-between; padding:12px 0; border-top:0.5px solid var(--border); margin-top:4px;">
+    <span style="font-size:14px; font-weight:600; color:var(--text);">Total</span>
+    <span style="font-size:14px; font-weight:600; color:var(--text);">${fmt(total)}</span>
+  </div>`;
+
+  document.getElementById('houseCostsList').innerHTML = html;
+}
+
+function renderPropertySettings() {
+  const enabled = isPropertyEnabled();
+  const statusEl = document.getElementById('propertyTabStatus');
+  const knob = document.getElementById('propertyToggleKnob');
+  const toggle = document.getElementById('propertyToggle');
+  if (statusEl) statusEl.textContent = enabled ? 'Enabled — Property tab is visible' : 'Disabled — tap to enable';
+  if (toggle) toggle.style.background = enabled ? '#c8f565' : 'var(--bg3)';
+  if (knob) { knob.style.left = enabled ? '21px' : '3px'; knob.style.background = enabled ? '#0a0a0a' : '#888'; }
+}
+
 function clearData() {
   if (!confirm('Clear ALL transactions and learned categories? This cannot be undone.')) return;
   DB.transactions = []; DB.learned = {}; DB.uploads = [];
@@ -2984,6 +3440,7 @@ if (DB.transactions.length) {
 }
 document.getElementById('monthPickerWrap').style.display = '';
 document.getElementById('customPickerWrap').style.display = 'none';
+updatePropertyNav();
 renderDashboard();
 renderTransactions();
 renderInsights();
