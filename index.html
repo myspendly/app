@@ -362,6 +362,41 @@
   </div>
 
   <div id="pinError" style="font-size:13px; color:#ff6b6b; margin-top:20px; min-height:20px; text-align:center;"></div>
+  <button onclick="showPinRecovery()" style="
+    margin-top:16px; background:none; border:none; color:#444;
+    font-family:'DM Sans',sans-serif; font-size:13px; cursor:pointer;
+  ">Forgot PIN?</button>
+</div>
+
+<!-- PIN RECOVERY SCREEN -->
+<div id="pinRecoveryScreen" style="
+  position:fixed; inset:0; z-index:10000; background:#0a0a0a;
+  display:none; flex-direction:column; align-items:center; justify-content:center;
+  padding: 40px 32px;
+">
+  <div style="width:100%; display:flex; justify-content:flex-start; margin-bottom:20px;">
+    <button onclick="hidePinRecovery()" style="
+      width:36px; height:36px; border-radius:50%; border:0.5px solid #333;
+      background:#1e1e1e; color:#888; font-size:18px; cursor:pointer;
+      display:flex; align-items:center; justify-content:center;
+    ">‹</button>
+  </div>
+  <div style="font-size:40px; margin-bottom:16px;">🔑</div>
+  <div style="font-size:22px; font-weight:600; color:#f0f0f0; margin-bottom:8px;">Forgot your PIN?</div>
+  <div style="font-size:14px; color:#666; margin-bottom:32px; text-align:center; line-height:1.6;">Enter your 8-character recovery code.<br>You were shown this when you set your PIN.</div>
+  <input id="recoveryCodeInput" type="text" maxlength="8" placeholder="Enter recovery code"
+    style="
+      width:100%; padding:14px 16px; border-radius:14px; margin-bottom:14px;
+      background:#1e1e1e; border:0.5px solid #333; color:#f0f0f0;
+      font-family:'DM Mono',monospace; font-size:18px; outline:none;
+      text-align:center; text-transform:uppercase; letter-spacing:0.1em;
+    ">
+  <button onclick="submitRecoveryCode()" style="
+    width:100%; padding:14px; border-radius:14px; border:none;
+    background:#c8f565; color:#0a0a0a; font-family:'DM Sans',sans-serif;
+    font-size:15px; font-weight:600; cursor:pointer; margin-bottom:10px;
+  ">Reset PIN</button>
+  <div id="recoveryError" style="font-size:13px; color:#ff6b6b; min-height:20px; text-align:center;"></div>
 </div>
 
 <!-- SET PIN SCREEN -->
@@ -407,6 +442,33 @@
     margin-top:24px; background:none; border:none; color:#444;
     font-family:'DM Sans',sans-serif; font-size:14px; cursor:pointer;
   ">Skip for now</button>
+</div>
+
+<!-- RECOVERY CODE DISPLAY SCREEN -->
+<div id="recoveryCodeScreen" style="
+  position:fixed; inset:0; z-index:9997; background:#0a0a0a;
+  display:none; flex-direction:column; align-items:center; justify-content:center;
+  padding: 40px 32px;
+">
+  <div style="font-size:40px; margin-bottom:16px;">🔑</div>
+  <div style="font-size:22px; font-weight:600; color:#f0f0f0; margin-bottom:8px;">Your recovery code</div>
+  <div style="font-size:14px; color:#666; margin-bottom:32px; text-align:center; line-height:1.6;">Write this down and keep it somewhere safe.<br>You'll need it if you ever forget your PIN.</div>
+  <div id="recoveryCodeDisplay" style="
+    background:#1e1e1e; border:0.5px solid #333; border-radius:16px;
+    padding:24px 32px; font-family:'DM Mono',monospace; font-size:28px;
+    font-weight:600; color:#c8f565; letter-spacing:0.15em; margin-bottom:32px;
+    text-align:center;
+  "></div>
+  <div style="background:rgba(255,107,107,0.1); border:0.5px solid rgba(255,107,107,0.3); border-radius:12px; padding:14px; margin-bottom:28px; width:100%;">
+    <div style="font-size:13px; color:#ff6b6b; text-align:center; line-height:1.6;">
+      ⚠️ This code will not be shown again.<br>Screenshot it or write it down now.
+    </div>
+  </div>
+  <button onclick="dismissRecoveryCode()" style="
+    width:100%; padding:16px; border-radius:16px; border:none;
+    background:#c8f565; color:#0a0a0a; font-family:'DM Sans',sans-serif;
+    font-size:16px; font-weight:600; cursor:pointer;
+  ">I've saved my code</button>
 </div>
 
 <input type="file" id="fileInput" accept=".csv,.pdf,.txt,.ofx,.qif">
@@ -735,9 +797,14 @@
   </div>
 
   <div class="card">
-    <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:12px;">
-      <div class="section-label" style="margin-bottom:0;">Category order</div>
-      <div style="display:flex; gap:8px;">
+    <div onclick="toggleCatSection()" style="display:flex; align-items:center; justify-content:space-between; cursor:pointer;">
+      <div class="section-label" style="margin-bottom:0;">Categories</div>
+      <div style="display:flex; align-items:center; gap:8px;">
+        <span id="catSectionArrow" style="color:var(--text3); font-size:18px; transition:transform 0.2s;">›</span>
+      </div>
+    </div>
+    <div id="catSection" style="display:none; margin-top:14px;">
+      <div style="display:flex; justify-content:flex-end; gap:8px; margin-bottom:12px;">
         <button onclick="openCatMgmt()" style="
           font-size:13px; font-weight:500; padding:5px 14px; border-radius:10px;
           border:0.5px solid var(--border2); background:var(--bg3);
@@ -749,8 +816,8 @@
           color:var(--text2); font-family:var(--font); cursor:pointer;
         ">Edit</button>
       </div>
+      <div id="catOrderList"></div>
     </div>
-    <div id="catOrderList"></div>
   </div>
 
   <div class="card">
@@ -997,10 +1064,60 @@
 
 // ─── PIN LOCK ─────────────────────────────────────────────────────────────────
 const PIN_KEY = 'spendly_pin';
+const RECOVERY_KEY = 'spendly_recovery';
 let pinEntry = '';
 let setPinEntry = '';
 let setPinConfirm = '';
 let setPinStep = 'set'; // 'set' or 'confirm'
+
+function generateRecoveryCode() {
+  const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
+  let code = '';
+  for (let i = 0; i < 8; i++) code += chars[Math.floor(Math.random() * chars.length)];
+  return code;
+}
+
+function showPinRecovery() {
+  document.getElementById('recoveryCodeInput').value = '';
+  document.getElementById('recoveryError').textContent = '';
+  document.getElementById('pinRecoveryScreen').style.display = 'flex';
+}
+
+function hidePinRecovery() {
+  document.getElementById('pinRecoveryScreen').style.display = 'none';
+}
+
+function submitRecoveryCode() {
+  const entered = document.getElementById('recoveryCodeInput').value.trim().toUpperCase();
+  const stored = localStorage.getItem(RECOVERY_KEY);
+  if (entered === stored) {
+    // Reset PIN — show set PIN screen
+    localStorage.removeItem(PIN_KEY);
+    document.getElementById('pinRecoveryScreen').style.display = 'none';
+    document.getElementById('pinLock').style.display = 'none';
+    setPinEntry = ''; setPinConfirm = ''; setPinStep = 'set';
+    document.getElementById('setPinTitle').textContent = 'Set a new PIN';
+    document.getElementById('setPinSub').textContent = 'Choose a new 4-digit PIN';
+    updatePinDots('', 'setPinDots');
+    document.getElementById('setPinScreen').style.display = 'flex';
+  } else {
+    document.getElementById('recoveryError').textContent = 'Incorrect recovery code. Try again.';
+  }
+}
+
+function dismissRecoveryCode() {
+  document.getElementById('recoveryCodeScreen').style.display = 'none';
+}
+
+// ─── COLLAPSIBLE CATEGORY SECTION ─────────────────────────────────────────────
+let catSectionOpen = false;
+
+function toggleCatSection() {
+  catSectionOpen = !catSectionOpen;
+  document.getElementById('catSection').style.display = catSectionOpen ? 'block' : 'none';
+  document.getElementById('catSectionArrow').style.transform = catSectionOpen ? 'rotate(90deg)' : '';
+  if (catSectionOpen) renderCatOrderList();
+}
 
 function initLock() {
   const hasPin = !!localStorage.getItem(PIN_KEY);
@@ -1094,9 +1211,14 @@ function setPinDelete() {
 function confirmSetPin() {
   if (setPinEntry === setPinConfirm) {
     localStorage.setItem(PIN_KEY, setPinEntry);
+    // Generate and save recovery code
+    const code = generateRecoveryCode();
+    localStorage.setItem(RECOVERY_KEY, code);
     document.getElementById('setPinScreen').style.display = 'none';
     setPinEntry = ''; setPinConfirm = ''; setPinStep = 'set';
-    showToast('✓ PIN set successfully!');
+    // Show recovery code screen
+    document.getElementById('recoveryCodeDisplay').textContent = code;
+    document.getElementById('recoveryCodeScreen').style.display = 'flex';
     renderSettings();
   } else {
     const dots = document.querySelectorAll('#setPinDots .pin-dot');
@@ -2417,7 +2539,8 @@ function renderSettings() {
   const timeoutSel = document.getElementById('timeoutSelect');
   if (timeoutSel) timeoutSel.value = getTimeoutMins().toString();
 
-  renderCatOrderList();
+  // Only render cat order list if section is open
+  if (catSectionOpen) renderCatOrderList();
 
   const learned = Object.entries(DB.learned);
 
