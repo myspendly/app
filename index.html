@@ -1212,22 +1212,29 @@
     </div>
 
     <!-- Budget row -->
-    <div id="catSheetBudgetRow" style="display:flex; align-items:center; gap:10px; background:var(--bg3); border-radius:12px; padding:10px 14px; margin-bottom:16px;">
-      <div style="font-size:13px; color:var(--text2); flex:1;">Monthly budget</div>
-      <div style="position:relative; display:flex; align-items:center;">
-        <span style="font-size:13px; color:var(--text2); margin-right:4px;">$</span>
-        <input id="catBudgetInput" type="text" inputmode="decimal" placeholder="Not set"
-          onchange="saveCatBudget()"
-          style="
-            width:90px; padding:6px 8px; border-radius:8px; font-size:13px; text-align:right;
-            background:var(--bg2); border:0.5px solid var(--border2);
-            color:var(--text); font-family:var(--font); outline:none;
-          ">
+    <div id="catSheetBudgetRow" style="background:var(--bg3); border-radius:12px; padding:12px 14px; margin-bottom:16px;">
+      <div style="font-size:13px; color:var(--text2); margin-bottom:10px;">Monthly budget</div>
+      <div style="display:flex; align-items:center; gap:10px;">
+        <div style="position:relative; flex:1;">
+          <span style="position:absolute; left:12px; top:50%; transform:translateY(-50%); color:var(--text2); font-size:16px;">$</span>
+          <input id="catBudgetInput" type="text" inputmode="decimal" placeholder="0.00"
+            style="
+              width:100%; padding:12px 12px 12px 28px; border-radius:10px; font-size:16px;
+              background:var(--bg2); border:0.5px solid var(--border2);
+              color:var(--text); font-family:var(--font); outline:none; box-sizing:border-box;
+            ">
+        </div>
+        <button onclick="saveCatBudget()" style="
+          padding:12px 18px; border-radius:10px; border:none;
+          background:var(--accent); color:#0a0a0a; font-family:var(--font);
+          font-size:14px; font-weight:600; cursor:pointer; white-space:nowrap; flex-shrink:0;
+        ">Save</button>
+        <button onclick="clearCatBudget()" style="
+          padding:12px 14px; border-radius:10px; border:0.5px solid var(--border2);
+          background:transparent; color:var(--text3); font-family:var(--font);
+          font-size:14px; cursor:pointer; white-space:nowrap; flex-shrink:0;
+        ">Clear</button>
       </div>
-      <button onclick="clearCatBudget()" style="
-        font-size:11px; padding:4px 8px; border-radius:6px; border:0.5px solid var(--border2);
-        background:transparent; color:var(--text3); font-family:var(--font); cursor:pointer; white-space:nowrap;
-      ">Clear</button>
     </div>
 
     <div id="catSheetTxns"></div>
