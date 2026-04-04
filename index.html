@@ -1504,14 +1504,16 @@ function renderCatEditorList() {
         style="color:var(--text3); font-size:18px; padding:4px 6px; cursor:grab; user-select:none; -webkit-user-select:none; touch-action:none; flex-shrink:0;">☰</div>
       <!-- Emoji -->
       <input value="${c.emoji}" onchange="renameCatEmoji('${cat}', this.value)" maxlength="2" style="
-        width:40px; padding:6px; border-radius:8px; font-size:18px; text-align:center;
+        width:44px; padding:8px; border-radius:8px; font-size:20px; text-align:center;
         background:var(--bg3); border:0.5px solid var(--border2); color:var(--text); outline:none; flex-shrink:0;
+        touch-action:manipulation;
       ">
       <!-- Name -->
       <input value="${cat}" onchange="renameCat('${cat}', this.value)" style="
-        flex:1; padding:8px 10px; border-radius:8px; font-size:14px; font-weight:500;
+        flex:1; padding:10px 12px; border-radius:8px; font-size:16px; font-weight:500;
         background:var(--bg3); border:0.5px solid var(--border2);
         color:var(--text); font-family:var(--font); outline:none; min-width:0;
+        touch-action:manipulation;
       ">
       <!-- Up/Down -->
       <button onclick="moveCatUp(${i})" style="
@@ -2198,14 +2200,16 @@ let barChartInst = null;
 
 function renderDashboard() {
   const allPeriod = filterByPeriod(DB.transactions, currentPeriod);
-  // Expenses = debits excluding transfers
-  const expenses = allPeriod.filter(t => t.category !== 'Transfers' && t.category !== 'Income');
-  // Net total: debits minus credits (refunds) within expense categories
-  const total = expenses.reduce((s, t) => s + (t.isDebit ? t.amount : -t.amount), 0);
-  const count = expenses.length;
 
-  const income = allPeriod.filter(t => t.category === 'Income').reduce((s, t) => s + t.amount, 0);
-  const savings = income - total;
+  // Expenses = all transactions except Income and Transfers
+  // Debits add to spend, credits (refunds) reduce spend
+  const expenses = allPeriod.filter(t => t.category !== 'Transfers' && t.category !== 'Income');
+  const total = parseFloat(expenses.reduce((s, t) => s + (t.isDebit ? t.amount : -t.amount), 0).toFixed(2));
+
+  // Income = all credit transactions categorised as Income
+  const income = parseFloat(allPeriod.filter(t => t.category === 'Income').reduce((s, t) => s + t.amount, 0).toFixed(2));
+
+  const savings = parseFloat((income - total).toFixed(2));
   const savingsPct = income > 0 ? Math.round(savings / income * 100) : 0;
   const savedBarPct = income > 0 ? Math.max(0, Math.min(100, savingsPct)) : 0;
 
@@ -2692,18 +2696,23 @@ function addNewCategory() {
   const colors = ['#80cbc4','#ffb74d','#f06292','#aed581','#7986cb','#4db6ac','#ff8a65'];
   const col = colors[Object.keys(CATS).length % colors.length];
   CATS[name] = { emoji, color: col, dim: col + '26' };
-  DB.customCats[name] = CATS[name];
+  DB.customCats[name] = { emoji, color: col, dim: col + '26' };
   DB.save();
 
-  // Add to order
-  const order = getOrderedCatNames();
-  order.splice(order.length - 2, 0, name); // Insert before Other
+  // Add to saved order — insert before Other
+  const saved = localStorage.getItem(CAT_ORDER_KEY);
+  let order = saved ? JSON.parse(saved) : getCatNames();
+  const otherIdx = order.indexOf('Other');
+  if (otherIdx >= 0) {
+    order.splice(otherIdx, 0, name);
+  } else {
+    order.push(name);
+  }
   saveCatOrder(order);
 
   nameEl.value = '';
   emojiEl.value = '';
   renderCatEditorList();
-  renderCatOrderList();
   renderDashboard();
   showToast(`✓ Added "${name}"`);
 }
@@ -3217,7 +3226,12 @@ function clearCatBudget() {
 
 let currentCatSheet = null;
 
+let savedScrollY = 0;
+
 function openCatSheet(cat) {
+  // Save current scroll position
+  savedScrollY = document.querySelector('#page-dashboard').scrollTop || window.scrollY || 0;
+
   currentCatSheet = cat;
   const c = CATS[cat] || CATS['Other'];
   const allPeriod = filterByPeriod(DB.transactions, currentPeriod);
@@ -3260,6 +3274,12 @@ function openCatSheet(cat) {
 function closeCatSheet(e) {
   if (!e || e.target === document.getElementById('catSheet')) {
     closeSheet('catSheet');
+    // Restore scroll position
+    setTimeout(() => {
+      const page = document.querySelector('#page-dashboard');
+      if (page) page.scrollTop = savedScrollY;
+      else window.scrollTo(0, savedScrollY);
+    }, 50);
   }
 }
 
