@@ -3195,7 +3195,11 @@ function saveCatBudget() {
     showToast('Budget cleared');
   }
   saveBudgets(budgets);
-  closeSheet('catSheet');
+  // Close sheet
+  document.getElementById('catSheet').classList.remove('open');
+  document.body.classList.remove('sheet-open');
+  // Go back to dashboard
+  showPage('dashboard', document.querySelector('.nav-btn'));
   renderDashboard();
 }
 
