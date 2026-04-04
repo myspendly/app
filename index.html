@@ -808,22 +808,15 @@
     <div onclick="toggleCatSection()" style="display:flex; align-items:center; justify-content:space-between; cursor:pointer;">
       <div class="section-label" style="margin-bottom:0;">Categories</div>
       <div style="display:flex; align-items:center; gap:8px;">
-        <span id="catSectionArrow" style="color:var(--text3); font-size:18px; transition:transform 0.2s;">›</span>
-      </div>
-    </div>
-    <div id="catSection" style="display:none; margin-top:14px;">
-      <div style="display:flex; justify-content:flex-end; gap:8px; margin-bottom:12px;">
-        <button onclick="openCatMgmt()" style="
-          font-size:13px; font-weight:500; padding:5px 14px; border-radius:10px;
-          border:0.5px solid var(--border2); background:var(--bg3);
-          color:var(--text2); font-family:var(--font); cursor:pointer;
-        ">Manage</button>
-        <button id="catEditBtn" onclick="toggleCatEdit()" style="
+        <button onclick="event.stopPropagation(); openCatEditor()" style="
           font-size:13px; font-weight:500; padding:5px 14px; border-radius:10px;
           border:0.5px solid var(--border2); background:var(--bg3);
           color:var(--text2); font-family:var(--font); cursor:pointer;
         ">Edit</button>
+        <span id="catSectionArrow" style="color:var(--text3); font-size:18px; transition:transform 0.2s;">›</span>
       </div>
+    </div>
+    <div id="catSection" style="display:none; margin-top:14px;">
       <div id="catOrderList"></div>
     </div>
   </div>
@@ -905,44 +898,45 @@
 </div>
 
 <!-- CATEGORY MANAGEMENT SHEET -->
-<div class="sheet-overlay" id="catMgmtSheet" onclick="closeCatMgmt(event)">
-  <div class="sheet" style="max-height:90vh;">
+<!-- CATEGORY EDITOR SHEET -->
+<div class="sheet-overlay" id="catEditorSheet" onclick="closeCatEditor(event)">
+  <div class="sheet" style="max-height:92vh;">
     <div class="sheet-handle"></div>
     <div style="display:flex; align-items:center; gap:12px; margin-bottom:20px;">
-      <button onclick="closeCatMgmt()" style="
+      <button onclick="closeCatEditor()" style="
         width:36px; height:36px; border-radius:50%; border:0.5px solid var(--border2);
         background:var(--bg3); color:var(--text2); font-size:18px; cursor:pointer;
         display:flex; align-items:center; justify-content:center; flex-shrink:0;
       ">‹</button>
-      <div class="sheet-title" style="margin-bottom:0;">Manage categories</div>
+      <div class="sheet-title" style="margin-bottom:0;">Edit categories</div>
     </div>
 
     <!-- Add new category -->
-    <div style="margin-bottom:20px;">
-      <div class="field-label">Add new category</div>
-      <div style="display:flex; gap:8px; margin-bottom:8px;">
+    <div style="background:var(--bg3); border-radius:var(--r); padding:14px; margin-bottom:20px;">
+      <div class="field-label" style="margin-bottom:10px;">Add new category</div>
+      <div style="display:flex; gap:8px;">
         <input id="newCatEmoji" type="text" placeholder="😀" maxlength="2" style="
-          width:52px; padding:12px; border-radius:var(--r); text-align:center;
-          background:var(--bg3); border:0.5px solid var(--border2);
-          color:var(--text); font-size:20px; outline:none;
+          width:48px; padding:10px; border-radius:var(--r); text-align:center;
+          background:var(--bg2); border:0.5px solid var(--border2);
+          color:var(--text); font-size:20px; outline:none; flex-shrink:0;
         ">
         <input id="newCatName" type="text" placeholder="Category name" style="
-          flex:1; padding:12px 14px; border-radius:var(--r);
-          background:var(--bg3); border:0.5px solid var(--border2);
+          flex:1; padding:10px 14px; border-radius:var(--r);
+          background:var(--bg2); border:0.5px solid var(--border2);
           color:var(--text); font-family:var(--font); font-size:14px; outline:none;
         ">
         <button onclick="addNewCategory()" style="
-          padding:12px 16px; border-radius:var(--r); border:none;
+          padding:10px 16px; border-radius:var(--r); border:none;
           background:var(--accent); color:#0a0a0a; font-family:var(--font);
-          font-size:14px; font-weight:600; cursor:pointer; white-space:nowrap;
+          font-size:14px; font-weight:600; cursor:pointer; white-space:nowrap; flex-shrink:0;
         ">Add</button>
       </div>
     </div>
 
-    <!-- Existing categories -->
-    <div class="field-label">Edit existing</div>
-    <div id="catMgmtList"></div>
-    <div style="height:12px;"></div>
+    <!-- Category list — name, emoji, position, delete all in one -->
+    <div class="field-label" style="margin-bottom:10px;">Your categories — drag ☰ to reorder</div>
+    <div id="catEditorList"></div>
+    <div style="height:20px;"></div>
   </div>
 </div>
 
@@ -1257,9 +1251,7 @@ function showSetPin() {
 
 // ─── CATEGORY ORDER ───────────────────────────────────────────────────────────
 const CAT_ORDER_KEY = 'spendly_cat_order';
-let catEditMode = false;
 let touchDragIdx = null;
-let touchDragEl = null;
 let touchStartY = 0;
 
 function getOrderedCatNames() {
@@ -1278,63 +1270,84 @@ function saveCatOrder(order) {
   localStorage.setItem(CAT_ORDER_KEY, JSON.stringify(order));
 }
 
-function toggleCatEdit() {
-  catEditMode = !catEditMode;
-  const btn = document.getElementById('catEditBtn');
-  if (btn) {
-    btn.textContent = catEditMode ? 'Done' : 'Edit';
-    btn.style.color = catEditMode ? '#c8f565' : 'var(--text2)';
-    btn.style.borderColor = catEditMode ? '#c8f565' : 'var(--border2)';
-  }
-  renderCatOrderList();
-}
-
+// Simple view list for settings page (collapsed section)
 function renderCatOrderList() {
   const ordered = getOrderedCatNames();
   const el = document.getElementById('catOrderList');
   if (!el) return;
+  el.innerHTML = ordered.map(cat => {
+    const c = CATS[cat] || CATS['Other'];
+    return `<div class="settings-row" style="cursor:default;">
+      <div class="settings-icon" style="background:${c.dim}">${c.emoji}</div>
+      <div class="settings-info"><div class="settings-title">${cat}</div></div>
+    </div>`;
+  }).join('');
+}
 
-  if (!catEditMode) {
-    // View mode — just show the list
-    el.innerHTML = ordered.map(cat => {
-      const c = CATS[cat] || CATS['Other'];
-      return `<div class="settings-row" style="cursor:default;">
-        <div class="settings-icon" style="background:${c.dim}">${c.emoji}</div>
-        <div class="settings-info"><div class="settings-title">${cat}</div></div>
-      </div>`;
-    }).join('');
-    return;
+// ─── UNIFIED CATEGORY EDITOR ──────────────────────────────────────────────────
+function openCatEditor() {
+  renderCatEditorList();
+  openSheet('catEditorSheet');
+  setTimeout(() => { document.querySelector('#catEditorSheet .sheet').scrollTop = 0; }, 50);
+}
+
+function closeCatEditor(e) {
+  if (!e || e.target === document.getElementById('catEditorSheet')) {
+    closeSheet('catEditorSheet');
+    renderCatOrderList();
+    renderDashboard();
   }
+}
 
-  // Edit mode — show drag handles with touch support
-  el.innerHTML = `
-    <div style="font-size:12px; color:var(--text2); margin-bottom:10px;">Hold and drag ☰ to reorder</div>
-    ${ordered.map((cat, i) => {
-      const c = CATS[cat] || CATS['Other'];
-      return `<div class="cat-order-row" id="catrow-${i}" data-idx="${i}" style="
-        display:flex; align-items:center; gap:12px; padding:10px 0;
-        border-bottom:0.5px solid var(--border); background:var(--bg2);
-        transition: opacity 0.15s;
+function renderCatEditorList() {
+  const ordered = getOrderedCatNames();
+  const PROTECTED = ['Other', 'Income', 'Transfers'];
+  const el = document.getElementById('catEditorList');
+  if (!el) return;
+
+  el.innerHTML = ordered.map((cat, i) => {
+    const c = CATS[cat] || CATS['Other'];
+    const isProtected = PROTECTED.includes(cat);
+    return `<div class="cat-order-row" id="catrow-${i}" style="
+      display:flex; align-items:center; gap:10px; padding:10px 0;
+      border-bottom:0.5px solid var(--border);
+    ">
+      <!-- Drag handle -->
+      <div ontouchstart="touchDragStart(event,${i})" ontouchmove="touchDragMove(event)" ontouchend="touchDragEnd(event,${i})"
+        style="color:var(--text3); font-size:18px; padding:4px 6px; cursor:grab; user-select:none; -webkit-user-select:none; touch-action:none; flex-shrink:0;">☰</div>
+      <!-- Emoji -->
+      <input value="${c.emoji}" onchange="renameCatEmoji('${cat}', this.value)" maxlength="2" style="
+        width:40px; padding:6px; border-radius:8px; font-size:18px; text-align:center;
+        background:var(--bg3); border:0.5px solid var(--border2); color:var(--text); outline:none; flex-shrink:0;
       ">
-        <div ontouchstart="touchDragStart(event,${i})" ontouchmove="touchDragMove(event)" ontouchend="touchDragEnd(event,${i})"
-          style="color:var(--text3); font-size:20px; padding:4px 8px; cursor:grab; user-select:none; -webkit-user-select:none; touch-action:none;">☰</div>
-        <div class="settings-icon" style="background:${c.dim}; flex-shrink:0;">${c.emoji}</div>
-        <div style="font-size:14px; font-weight:500; color:var(--text);">${cat}</div>
-        <div style="display:flex; gap:8px; margin-left:auto;">
-          <button onclick="moveCatUp(${i})" style="
-            width:30px; height:30px; border-radius:8px; border:0.5px solid var(--border2);
-            background:var(--bg3); color:var(--text2); font-size:14px; cursor:pointer;
-            display:flex; align-items:center; justify-content:center;
-          ">↑</button>
-          <button onclick="moveCatDown(${i})" style="
-            width:30px; height:30px; border-radius:8px; border:0.5px solid var(--border2);
-            background:var(--bg3); color:var(--text2); font-size:14px; cursor:pointer;
-            display:flex; align-items:center; justify-content:center;
-          ">↓</button>
-        </div>
-      </div>`;
-    }).join('')}
-  `;
+      <!-- Name -->
+      <input value="${cat}" onchange="renameCat('${cat}', this.value)" style="
+        flex:1; padding:8px 10px; border-radius:8px; font-size:14px; font-weight:500;
+        background:var(--bg3); border:0.5px solid var(--border2);
+        color:var(--text); font-family:var(--font); outline:none; min-width:0;
+      ">
+      <!-- Up/Down -->
+      <button onclick="moveCatUp(${i})" style="
+        width:28px; height:28px; border-radius:7px; border:0.5px solid var(--border2);
+        background:var(--bg3); color:var(--text2); font-size:13px; cursor:pointer;
+        display:flex; align-items:center; justify-content:center; flex-shrink:0;
+      ">↑</button>
+      <button onclick="moveCatDown(${i})" style="
+        width:28px; height:28px; border-radius:7px; border:0.5px solid var(--border2);
+        background:var(--bg3); color:var(--text2); font-size:13px; cursor:pointer;
+        display:flex; align-items:center; justify-content:center; flex-shrink:0;
+      ">↓</button>
+      <!-- Delete -->
+      ${isProtected
+        ? `<div style="width:28px; flex-shrink:0;"></div>`
+        : `<button onclick="confirmDeleteCat('${cat}')" style="
+            width:28px; height:28px; border-radius:7px; border:0.5px solid rgba(255,107,107,0.3);
+            background:rgba(255,107,107,0.1); color:#ff6b6b; font-size:14px; cursor:pointer;
+            display:flex; align-items:center; justify-content:center; flex-shrink:0;
+          ">🗑</button>`
+      }
+    </div>`;
+  }).join('');
 }
 
 function moveCatUp(i) {
@@ -1342,8 +1355,7 @@ function moveCatUp(i) {
   const order = getOrderedCatNames();
   [order[i-1], order[i]] = [order[i], order[i-1]];
   saveCatOrder(order);
-  renderCatOrderList();
-  renderDashboard();
+  renderCatEditorList();
 }
 
 function moveCatDown(i) {
@@ -1351,11 +1363,10 @@ function moveCatDown(i) {
   if (i >= order.length - 1) return;
   [order[i], order[i+1]] = [order[i+1], order[i]];
   saveCatOrder(order);
-  renderCatOrderList();
-  renderDashboard();
+  renderCatEditorList();
 }
 
-// Touch drag support
+// Touch drag inside editor sheet
 function touchDragStart(e, i) {
   touchDragIdx = i;
   touchStartY = e.touches[0].clientY;
@@ -1367,8 +1378,7 @@ function touchDragMove(e) {
   e.preventDefault();
   if (touchDragIdx === null) return;
   const y = e.touches[0].clientY;
-  const rows = document.querySelectorAll('.cat-order-row');
-  rows.forEach((row, i) => {
+  document.querySelectorAll('.cat-order-row').forEach((row, i) => {
     const rect = row.getBoundingClientRect();
     if (y >= rect.top && y <= rect.bottom && i !== touchDragIdx) {
       row.style.borderTop = i < touchDragIdx ? '2px solid #c8f565' : '';
@@ -1397,26 +1407,15 @@ function touchDragEnd(e, i) {
     const moved = order.splice(touchDragIdx, 1)[0];
     order.splice(dropIdx, 0, moved);
     saveCatOrder(order);
-    renderDashboard();
+    renderCatEditorList();
   }
   touchDragIdx = null;
-  renderCatOrderList();
 }
 
-let dragCatIdx = null;
-function dragCatStart(e, i) { dragCatIdx = i; }
-function dragCatOver(e) { e.preventDefault(); }
-function dragCatDrop(e, i) {
-  e.preventDefault();
-  if (dragCatIdx === null || dragCatIdx === i) return;
-  const order = getOrderedCatNames();
-  const moved = order.splice(dragCatIdx, 1)[0];
-  order.splice(i, 0, moved);
-  saveCatOrder(order);
-  dragCatIdx = null;
-  renderCatOrderList();
-  renderDashboard();
-}
+// Keep openCatMgmt as alias so existing delete flow still works
+function openCatMgmt() { openCatEditor(); }
+function closeCatMgmt(e) { closeCatEditor(e); }
+function renderCatMgmtList() { renderCatEditorList(); }
 
 // ─── AUTO-LOCK TIMEOUT ────────────────────────────────────────────────────────
 const TIMEOUT_KEY = 'spendly_timeout';
@@ -2427,50 +2426,6 @@ function saveCustomCats(obj) {
   localStorage.setItem(CUSTOM_CATS_KEY, JSON.stringify(obj));
 }
 
-function openCatMgmt() {
-  renderCatMgmtList();
-  openSheet('catMgmtSheet');
-  setTimeout(() => { document.querySelector('#catMgmtSheet .sheet').scrollTop = 0; }, 50);
-}
-
-function closeCatMgmt(e) {
-  if (!e || e.target === document.getElementById('catMgmtSheet')) {
-    closeSheet('catMgmtSheet');
-  }
-}
-
-function renderCatMgmtList() {
-  const el = document.getElementById('catMgmtList');
-  if (!el) return;
-  const ordered = getOrderedCatNames();
-  // Protected categories that can't be deleted
-  const PROTECTED = ['Other', 'Income', 'Transfers'];
-  el.innerHTML = ordered.map(name => {
-    const c = CATS[name] || CATS['Other'];
-    const isProtected = PROTECTED.includes(name);
-    return `<div style="display:flex; align-items:center; gap:10px; padding:10px 0; border-bottom:0.5px solid var(--border);">
-      <div style="width:36px; height:36px; border-radius:10px; background:${c.dim}; display:flex; align-items:center; justify-content:center; font-size:18px; flex-shrink:0;">${c.emoji}</div>
-      <input value="${name}" onchange="renameCat('${name}', this.value)" style="
-        flex:1; padding:8px 10px; border-radius:10px; font-size:14px;
-        background:var(--bg3); border:0.5px solid var(--border2);
-        color:var(--text); font-family:var(--font); outline:none;
-      ">
-      <input value="${c.emoji}" onchange="renameCatEmoji('${name}', this.value)" maxlength="2" style="
-        width:44px; padding:8px; border-radius:10px; font-size:18px; text-align:center;
-        background:var(--bg3); border:0.5px solid var(--border2);
-        color:var(--text); outline:none;
-      ">
-      ${isProtected
-        ? `<div style="width:32px; height:32px; flex-shrink:0;"></div>`
-        : `<button onclick="confirmDeleteCat('${name}')" style="
-            width:32px; height:32px; border-radius:8px; border:0.5px solid rgba(255,107,107,0.3);
-            background:rgba(255,107,107,0.1); color:#ff6b6b; font-size:16px;
-            cursor:pointer; display:flex; align-items:center; justify-content:center; flex-shrink:0;
-          ">🗑</button>`
-      }
-    </div>`;
-  }).join('');
-}
 
 function renameCat(oldName, newName) {
   newName = newName.trim();
@@ -2489,7 +2444,7 @@ function renameCat(oldName, newName) {
   saveCatOrder(order);
 
   DB.save();
-  renderCatMgmtList();
+  renderCatEditorList();
   renderDashboard();
   renderTransactions();
   showToast(`✓ Renamed to ${newName}`);
@@ -2500,7 +2455,7 @@ function renameCatEmoji(catName, newEmoji) {
   if (!newEmoji || !CATS[catName]) return;
   CATS[catName].emoji = newEmoji;
   if (DB.customCats[catName]) { DB.customCats[catName].emoji = newEmoji; DB.save(); }
-  renderCatMgmtList();
+  renderCatEditorList();
   renderDashboard();
   showToast(`✓ Emoji updated`);
 }
@@ -2528,7 +2483,7 @@ function addNewCategory() {
 
   nameEl.value = '';
   emojiEl.value = '';
-  renderCatMgmtList();
+  renderCatEditorList();
   renderCatOrderList();
   renderDashboard();
   showToast(`✓ Added "${name}"`);
@@ -2543,7 +2498,7 @@ function confirmDeleteCat(name) {
     You are about to delete <strong style="color:var(--text);">${name}</strong>.<br>
     This category has <strong style="color:var(--text);">${count} transaction${count !== 1 ? 's' : ''}</strong> in it.
   `;
-  closeSheet('catMgmtSheet');
+  closeSheet('catEditorSheet');
   setTimeout(() => {
     openSheet('deleteCatSheet');
   }, 200);
@@ -2553,8 +2508,7 @@ function closeDeleteCatSheet(e) {
   if (!e || e.target === document.getElementById('deleteCatSheet')) {
     closeSheet('deleteCatSheet');
     deleteCatTarget = null;
-    // Reopen manage sheet
-    setTimeout(() => openCatMgmt(), 200);
+    setTimeout(() => openCatEditor(), 200);
   }
 }
 
