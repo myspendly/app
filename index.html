@@ -3192,8 +3192,10 @@ function saveCatBudget() {
     showToast(`✓ Budget set to ${fmt(val)}/month`);
   } else {
     delete budgets[currentCatSheet];
+    showToast('Budget cleared');
   }
   saveBudgets(budgets);
+  closeSheet('catSheet');
   renderDashboard();
 }
 
