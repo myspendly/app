@@ -606,9 +606,17 @@
 
 <!-- TRANSACTIONS -->
 <div class="page" id="page-transactions">
-  <div class="page-header">
-    <h1>Transactions</h1>
-    <p id="txnCount">0 transactions</p>
+  <div class="page-header" style="display:flex; align-items:center; justify-content:space-between;">
+    <div>
+      <h1>Transactions</h1>
+      <p id="txnCount">0 transactions</p>
+    </div>
+    <button onclick="openManualEntry()" style="
+      width:40px; height:40px; border-radius:50%; border:none;
+      background:var(--accent); color:#0a0a0a; font-size:22px; font-weight:400;
+      cursor:pointer; display:flex; align-items:center; justify-content:center;
+      flex-shrink:0; touch-action:manipulation;
+    ">+</button>
   </div>
 
   <div class="search-wrap">
@@ -1276,6 +1284,68 @@
         </div>
       </div>
       <div id="catSheetTxns"></div>
+    </div>
+  </div>
+</div>
+
+<!-- MANUAL ENTRY SHEET -->
+<div class="sheet-overlay" id="manualEntrySheet" onclick="closeManualEntry(event)">
+  <div class="sheet">
+    <div class="sheet-header">
+      <div class="sheet-handle" style="margin-bottom:12px;"></div>
+      <div style="display:flex; align-items:center; gap:12px;">
+        <button onclick="closeManualEntry()" style="
+          width:36px; height:36px; border-radius:50%; border:0.5px solid var(--border2);
+          background:var(--bg3); color:var(--text2); font-size:18px; cursor:pointer;
+          display:flex; align-items:center; justify-content:center; flex-shrink:0;
+          touch-action:manipulation;
+        ">‹</button>
+        <div class="sheet-title" style="margin-bottom:0;">Add expense</div>
+      </div>
+    </div>
+    <div class="sheet-body">
+
+      <!-- Amount -->
+      <div class="field-label">Amount</div>
+      <div style="position:relative; margin-bottom:16px;">
+        <span style="position:absolute; left:14px; top:50%; transform:translateY(-50%); color:var(--text2); font-size:18px; font-weight:500;">$</span>
+        <input id="manualAmount" type="text" inputmode="decimal" placeholder="0.00" style="
+          width:100%; padding:14px 14px 14px 32px; border-radius:var(--r); font-size:24px; font-weight:600;
+          background:var(--bg3); border:0.5px solid var(--border2);
+          color:var(--text); font-family:var(--font); outline:none; box-sizing:border-box;
+          touch-action:manipulation;
+        ">
+      </div>
+
+      <!-- Description -->
+      <div class="field-label">Description</div>
+      <input id="manualMerchant" type="text" placeholder="e.g. Coffee, Bunnings, Petrol" style="
+        width:100%; padding:13px 14px; border-radius:var(--r); font-size:16px; margin-bottom:16px;
+        background:var(--bg3); border:0.5px solid var(--border2);
+        color:var(--text); font-family:var(--font); outline:none; box-sizing:border-box;
+        touch-action:manipulation;
+      ">
+
+      <!-- Category -->
+      <div class="field-label">Category</div>
+      <div id="manualCatPicker" style="
+        max-height:180px; overflow-y:auto; border-radius:var(--r);
+        border:0.5px solid var(--border2); margin-bottom:16px;
+      "></div>
+
+      <!-- Date -->
+      <div class="field-label">Date</div>
+      <input id="manualDate" type="date" style="
+        width:100%; padding:13px 14px; border-radius:var(--r); font-size:16px; margin-bottom:24px;
+        background:var(--bg3); border:0.5px solid var(--border2);
+        color:var(--text); font-family:var(--font); outline:none; box-sizing:border-box;
+      ">
+
+      <button onclick="saveManualEntry()" style="
+        width:100%; padding:16px; border-radius:var(--r); border:none;
+        background:var(--accent); color:#0a0a0a; font-family:var(--font);
+        font-size:16px; font-weight:600; cursor:pointer; touch-action:manipulation;
+      ">Add transaction</button>
     </div>
   </div>
 </div>
@@ -2457,6 +2527,79 @@ function renderBarChart() {
 }
 
 // ─── TRANSACTIONS ─────────────────────────────────────────────────────────────
+// ─── MANUAL ENTRY ─────────────────────────────────────────────────────────────
+let manualSelectedCat = 'Other';
+
+function openManualEntry() {
+  // Default to today
+  document.getElementById('manualDate').value = new Date().toISOString().split('T')[0];
+  document.getElementById('manualAmount').value = '';
+  document.getElementById('manualMerchant').value = '';
+  manualSelectedCat = 'Other';
+  renderManualCatPicker();
+  openSheet('manualEntrySheet');
+  setTimeout(() => { document.querySelector('#manualEntrySheet .sheet').scrollTop = 0; }, 50);
+}
+
+function closeManualEntry(e) {
+  if (!e || e.target === document.getElementById('manualEntrySheet')) {
+    closeSheet('manualEntrySheet');
+  }
+}
+
+function renderManualCatPicker() {
+  const ordered = getOrderedCatNames().filter(n => n !== 'Income' && n !== 'Transfers');
+  document.getElementById('manualCatPicker').innerHTML = ordered.map(n => {
+    const c = CATS[n] || CATS['Other'];
+    const isSelected = n === manualSelectedCat;
+    return `<div onclick="selectManualCat('${n}')" style="
+      display:flex; align-items:center; gap:12px; padding:10px 14px;
+      border-bottom:0.5px solid var(--border); cursor:pointer;
+      background:${isSelected ? 'var(--accent-dim)' : 'transparent'};
+      touch-action:manipulation;
+    ">
+      <div style="width:28px; height:28px; border-radius:8px; background:${c.dim}; display:flex; align-items:center; justify-content:center; font-size:14px; flex-shrink:0;">${c.emoji}</div>
+      <div style="font-size:14px; font-weight:${isSelected ? '600' : '400'}; color:${isSelected ? 'var(--accent)' : 'var(--text)'}; flex:1;">${n}</div>
+      ${isSelected ? '<div style="color:var(--accent);">✓</div>' : ''}
+    </div>`;
+  }).join('');
+}
+
+function selectManualCat(cat) {
+  manualSelectedCat = cat;
+  renderManualCatPicker();
+}
+
+function saveManualEntry() {
+  const amount = parseFloat(document.getElementById('manualAmount').value.replace(/,/g,''));
+  const merchant = document.getElementById('manualMerchant').value.trim();
+  const date = document.getElementById('manualDate').value;
+
+  if (!amount || amount <= 0) { showToast('Please enter an amount'); return; }
+  if (!merchant) { showToast('Please enter a description'); return; }
+  if (!date) { showToast('Please select a date'); return; }
+
+  const txn = {
+    id: 'manual-' + Date.now(),
+    date,
+    merchant,
+    rawMerchant: merchant,
+    amount: parseFloat(amount.toFixed(2)),
+    category: manualSelectedCat,
+    isDebit: true,
+    learned: false,
+    manual: true, // flag as manually added
+  };
+
+  DB.transactions.push(txn);
+  DB.save();
+
+  closeSheet('manualEntrySheet');
+  renderTransactions();
+  renderDashboard();
+  showToast(`✓ Added ${merchant}`);
+}
+
 function renderTransactions() {
   const search = document.getElementById('searchInput').value.toLowerCase();
   let txns = [...DB.transactions].sort((a,b) => new Date(b.date) - new Date(a.date));
@@ -2495,7 +2638,7 @@ function renderTransactions() {
         <div class="txn-item" onclick="openTxnSheet('${t.id}')">
           <div class="txn-icon" style="background:${c.dim}">${c.emoji}</div>
           <div class="txn-info">
-            <div class="txn-merchant">${t.merchant}${t.learned ? '<span class="learned-dot" title="Learned"></span>' : ''}</div>
+            <div class="txn-merchant">${t.merchant}${t.learned ? '<span class="learned-dot" title="Learned"></span>' : ''}${t.manual ? '<span style="font-size:10px; margin-left:4px;" title="Manually added">✏️</span>' : ''}</div>
             <div class="txn-meta">${t.category}</div>
           </div>
           <div class="txn-right">
@@ -2587,7 +2730,14 @@ function closeTxnSheet(e) {
     if (sheetOpenedFromCat) {
       const returnCat = sheetOpenedFromCat;
       sheetOpenedFromCat = null;
-      setTimeout(() => openCatSheet(returnCat), 200);
+      setTimeout(() => {
+        openCatSheet(returnCat);
+        // Restore scroll position after sheet renders
+        setTimeout(() => {
+          const catSheetEl = document.querySelector('#catSheet .sheet');
+          if (catSheetEl) catSheetEl.scrollTop = savedCatSheetScrollY;
+        }, 100);
+      }, 200);
     }
   }
 }
@@ -3313,7 +3463,7 @@ function openCatSheet(cat) {
   document.getElementById('catSheetTxns').innerHTML = txns.length ? txns.map(t => `
     <div class="txn-item" onclick="openTxnSheetFromCat('${t.id}')">
       <div class="txn-info">
-        <div class="txn-merchant">${t.merchant}${t.learned ? '<span class="learned-dot"></span>' : ''}</div>
+        <div class="txn-merchant">${t.merchant}${t.learned ? '<span class="learned-dot"></span>' : ''}${t.manual ? '<span style="font-size:10px; margin-left:4px;">✏️</span>' : ''}</div>
         <div class="txn-meta">${formatDate(t.date)}</div>
       </div>
       <div class="txn-right">
@@ -3332,8 +3482,12 @@ function closeCatSheet(e) {
   }
 }
 
+let savedCatSheetScrollY = 0;
+
 function openTxnSheetFromCat(id) {
-  // Remember we came from a cat sheet so we return to it after saving
+  // Save the cat sheet scroll position before closing it
+  const catSheetEl = document.querySelector('#catSheet .sheet');
+  savedCatSheetScrollY = catSheetEl ? catSheetEl.scrollTop : 0;
   closeSheet('catSheet');
   setTimeout(() => {
     openTxnSheet(id);
