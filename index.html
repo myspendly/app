@@ -2604,7 +2604,10 @@ function saveManualEntry() {
   closeSheet('manualEntrySheet');
   renderTransactions();
   renderDashboard();
+  renderInsights();
   showToast(`✓ Added ${merchant}`);
+  // Navigate to dashboard so user can see it immediately
+  showPage('dashboard', document.querySelector('.nav-btn'));
 }
 
 function renderTransactions() {
