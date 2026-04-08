@@ -808,147 +808,178 @@
     <p>Manage your data & preferences</p>
   </div>
 
+  <!-- Categories -->
   <div class="card">
-    <div class="section-label">Security</div>
-    <div class="settings-row" onclick="showSetPin()">
-      <div class="settings-icon">🔐</div>
-      <div class="settings-info">
-        <div class="settings-title">Change PIN</div>
-        <div class="settings-sub" id="pinStatus">Set a 4-digit PIN to lock the app</div>
-      </div>
-      <div class="settings-arrow">›</div>
-    </div>
-    <div class="settings-row">
-      <div class="settings-icon">⏱️</div>
-      <div class="settings-info">
-        <div class="settings-title">Auto-lock timeout</div>
-        <div class="settings-sub">Lock app after inactivity</div>
-      </div>
-      <select id="timeoutSelect" onchange="saveTimeout(this.value)" style="
-        font-size:13px; padding:6px 10px; border-radius:10px;
-        background:var(--bg3); border:0.5px solid var(--border2);
-        color:var(--text); font-family:var(--font); cursor:pointer;
-      ">
-        <option value="0">Never</option>
-        <option value="1">1 min</option>
-        <option value="2" selected>2 mins</option>
-        <option value="5">5 mins</option>
-        <option value="10">10 mins</option>
-      </select>
-    </div>
-  </div>
-
-  <div class="card">
-    <div onclick="toggleCatSection()" style="display:flex; align-items:center; justify-content:space-between; cursor:pointer;">
+    <div onclick="toggleSettingsSection('sectionCategories', 'arrowCategories')" style="display:flex; align-items:center; justify-content:space-between; cursor:pointer;">
       <div class="section-label" style="margin-bottom:0;">Categories</div>
-      <div style="display:flex; align-items:center; gap:8px;">
-        <button onclick="event.stopPropagation(); openCatEditor()" style="
-          font-size:13px; font-weight:500; padding:5px 14px; border-radius:10px;
+      <span id="arrowCategories" style="color:var(--text3); font-size:18px; transition:transform 0.2s;">›</span>
+    </div>
+    <div id="sectionCategories" style="display:none; margin-top:14px;">
+      <div style="margin-bottom:10px;">
+        <button onclick="openCatEditor()" style="
+          font-size:13px; font-weight:500; padding:8px 18px; border-radius:10px;
           border:0.5px solid var(--border2); background:var(--bg3);
-          color:var(--text2); font-family:var(--font); cursor:pointer;
-        ">Edit</button>
-        <span id="catSectionArrow" style="color:var(--text3); font-size:18px; transition:transform 0.2s;">›</span>
+          color:var(--text2); font-family:var(--font); cursor:pointer; width:100%;
+        ">Edit categories</button>
       </div>
-    </div>
-    <div id="catSection" style="display:none; margin-top:14px;">
       <div id="catOrderList"></div>
+      <div id="catSection"></div>
     </div>
   </div>
 
+  <!-- Property tab -->
   <div class="card">
-    <div class="section-label">Backup & restore</div>
-
-    <!-- Export full backup -->
-    <div class="settings-row" onclick="exportFullBackup()">
-      <div class="settings-icon">💾</div>
-      <div class="settings-info">
-        <div class="settings-title">Export full backup</div>
-        <div class="settings-sub">Saves everything — transactions, categories & settings</div>
-      </div>
-      <div class="settings-arrow">›</div>
+    <div onclick="toggleSettingsSection('sectionProperty', 'arrowProperty')" style="display:flex; align-items:center; justify-content:space-between; cursor:pointer;">
+      <div class="section-label" style="margin-bottom:0;">Property tab</div>
+      <span id="arrowProperty" style="color:var(--text3); font-size:18px; transition:transform 0.2s;">›</span>
     </div>
-
-    <!-- Import backup -->
-    <div class="settings-row" onclick="document.getElementById('backupFileInput').click()">
-      <div class="settings-icon">📲</div>
-      <div class="settings-info">
-        <div class="settings-title">Restore from backup</div>
-        <div class="settings-sub">Import a previously exported backup file</div>
-      </div>
-      <div class="settings-arrow">›</div>
-    </div>
-    <input type="file" id="backupFileInput" accept=".json" style="display:none;" onchange="importFullBackup(event)">
-
-    <!-- Export CSV -->
-    <div class="settings-row" onclick="exportData()">
-      <div class="settings-icon">📤</div>
-      <div class="settings-info">
-        <div class="settings-title">Export transactions as CSV</div>
-        <div class="settings-sub">For use in Excel or other apps</div>
-      </div>
-      <div class="settings-arrow">›</div>
-    </div>
-
-    <!-- How to transfer guide -->
-    <div style="background:var(--bg3); border-radius:var(--r); padding:14px; margin-top:8px;">
-      <div style="font-size:12px; font-weight:600; color:var(--text); margin-bottom:10px;">📱 How to transfer to a new phone</div>
-      <div style="font-size:12px; color:var(--text2); line-height:1.9;">
-        <div style="margin-bottom:4px;"><span style="color:var(--accent); font-weight:600;">Step 1</span> &nbsp;On your old phone, tap <strong style="color:var(--text);">Export full backup</strong> above</div>
-        <div style="margin-bottom:4px;"><span style="color:var(--accent); font-weight:600;">Step 2</span> &nbsp;Save the file to iCloud Drive or email it to yourself</div>
-        <div style="margin-bottom:4px;"><span style="color:var(--accent); font-weight:600;">Step 3</span> &nbsp;On your new phone, open Spendly and go to Settings</div>
-        <div style="margin-bottom:4px;"><span style="color:var(--accent); font-weight:600;">Step 4</span> &nbsp;Tap <strong style="color:var(--text);">Restore from backup</strong> and select your file</div>
-        <div><span style="color:var(--accent); font-weight:600;">Step 5</span> &nbsp;All your data, categories and history will be restored ✓</div>
+    <div id="sectionProperty" style="display:none; margin-top:14px;">
+      <div class="settings-row" onclick="openMortgageEditor()">
+        <div class="settings-icon">🏠</div>
+        <div class="settings-info">
+          <div class="settings-title">Mortgage details</div>
+          <div class="settings-sub" id="propertyTabStatus">Disabled — tap to enable</div>
+        </div>
+        <div id="propertyToggle" onclick="event.stopPropagation(); togglePropertyTab()" style="
+          width:44px; height:26px; border-radius:13px; background:var(--bg3);
+          border:0.5px solid var(--border2); position:relative; cursor:pointer; transition:background 0.2s; flex-shrink:0;
+        ">
+          <div id="propertyToggleKnob" style="
+            width:20px; height:20px; border-radius:50%; background:#888;
+            position:absolute; top:3px; left:3px; transition:left 0.2s, background 0.2s;
+          "></div>
+        </div>
       </div>
     </div>
   </div>
 
+  <!-- Security -->
   <div class="card">
-    <div class="section-label">Features</div>
-    <div class="settings-row" onclick="openMortgageEditor()">
-      <div class="settings-icon">🏠</div>
-      <div class="settings-info">
-        <div class="settings-title">Property tab</div>
-        <div class="settings-sub" id="propertyTabStatus">Disabled — tap to enable</div>
+    <div onclick="toggleSettingsSection('sectionSecurity', 'arrowSecurity')" style="display:flex; align-items:center; justify-content:space-between; cursor:pointer;">
+      <div class="section-label" style="margin-bottom:0;">Security</div>
+      <span id="arrowSecurity" style="color:var(--text3); font-size:18px; transition:transform 0.2s;">›</span>
+    </div>
+    <div id="sectionSecurity" style="display:none; margin-top:4px;">
+      <div class="settings-row" onclick="showSetPin()">
+        <div class="settings-icon">🔐</div>
+        <div class="settings-info">
+          <div class="settings-title">Change PIN</div>
+          <div class="settings-sub" id="pinStatus">Set a 4-digit PIN to lock the app</div>
+        </div>
+        <div class="settings-arrow">›</div>
       </div>
-      <div id="propertyToggle" onclick="event.stopPropagation(); togglePropertyTab()" style="
-        width:44px; height:26px; border-radius:13px; background:var(--bg3);
-        border:0.5px solid var(--border2); position:relative; cursor:pointer; transition:background 0.2s; flex-shrink:0;
-      ">
-        <div id="propertyToggleKnob" style="
-          width:20px; height:20px; border-radius:50%; background:#888;
-          position:absolute; top:3px; left:3px; transition:left 0.2s, background 0.2s;
-        "></div>
+      <div class="settings-row">
+        <div class="settings-icon">⏱️</div>
+        <div class="settings-info">
+          <div class="settings-title">Auto-lock timeout</div>
+          <div class="settings-sub">Lock app after inactivity</div>
+        </div>
+        <select id="timeoutSelect" onchange="saveTimeout(this.value)" style="
+          font-size:13px; padding:6px 10px; border-radius:10px;
+          background:var(--bg3); border:0.5px solid var(--border2);
+          color:var(--text); font-family:var(--font); cursor:pointer;
+        ">
+          <option value="0">Never</option>
+          <option value="1">1 min</option>
+          <option value="2" selected>2 mins</option>
+          <option value="5">5 mins</option>
+          <option value="10">10 mins</option>
+        </select>
       </div>
     </div>
   </div>
 
+  <!-- Backup & restore -->
   <div class="card">
-    <div class="section-label">Danger zone</div>
-    <div class="settings-row" onclick="clearData()">
-      <div class="settings-icon">🗑️</div>
-      <div class="settings-info">
-        <div class="settings-title">Clear all data</div>
-        <div class="settings-sub">Remove all transactions and learned categories</div>
+    <div onclick="toggleSettingsSection('sectionBackup', 'arrowBackup')" style="display:flex; align-items:center; justify-content:space-between; cursor:pointer;">
+      <div class="section-label" style="margin-bottom:0;">Backup & restore</div>
+      <span id="arrowBackup" style="color:var(--text3); font-size:18px; transition:transform 0.2s;">›</span>
+    </div>
+    <div id="sectionBackup" style="display:none; margin-top:4px;">
+      <div class="settings-row" onclick="exportFullBackup()">
+        <div class="settings-icon">💾</div>
+        <div class="settings-info">
+          <div class="settings-title">Export full backup</div>
+          <div class="settings-sub">Saves everything — transactions, categories & settings</div>
+        </div>
+        <div class="settings-arrow">›</div>
       </div>
-      <div class="settings-arrow">›</div>
+      <div class="settings-row" onclick="document.getElementById('backupFileInput').click()">
+        <div class="settings-icon">📲</div>
+        <div class="settings-info">
+          <div class="settings-title">Restore from backup</div>
+          <div class="settings-sub">Import a previously exported backup file</div>
+        </div>
+        <div class="settings-arrow">›</div>
+      </div>
+      <input type="file" id="backupFileInput" accept=".json" style="display:none;" onchange="importFullBackup(event)">
+      <div class="settings-row" onclick="exportData()">
+        <div class="settings-icon">📤</div>
+        <div class="settings-info">
+          <div class="settings-title">Export transactions as CSV</div>
+          <div class="settings-sub">For use in Excel or other apps</div>
+        </div>
+        <div class="settings-arrow">›</div>
+      </div>
+      <div style="background:var(--bg3); border-radius:var(--r); padding:14px; margin-top:8px;">
+        <div style="font-size:12px; font-weight:600; color:var(--text); margin-bottom:10px;">📱 How to transfer to a new phone</div>
+        <div style="font-size:12px; color:var(--text2); line-height:1.9;">
+          <div style="margin-bottom:4px;"><span style="color:var(--accent); font-weight:600;">Step 1</span> &nbsp;On your old phone, tap <strong style="color:var(--text);">Export full backup</strong> above</div>
+          <div style="margin-bottom:4px;"><span style="color:var(--accent); font-weight:600;">Step 2</span> &nbsp;Save the file to iCloud Drive or email it to yourself</div>
+          <div style="margin-bottom:4px;"><span style="color:var(--accent); font-weight:600;">Step 3</span> &nbsp;On your new phone, open Spendly and go to Settings</div>
+          <div style="margin-bottom:4px;"><span style="color:var(--accent); font-weight:600;">Step 4</span> &nbsp;Tap <strong style="color:var(--text);">Restore from backup</strong> and select your file</div>
+          <div><span style="color:var(--accent); font-weight:600;">Step 5</span> &nbsp;All your data, categories and history will be restored ✓</div>
+        </div>
+      </div>
     </div>
   </div>
 
+  <!-- Danger zone -->
   <div class="card">
-    <div class="section-label">Learned categories</div>
-    <div id="learnedList">
-      <div style="font-size: 13px; color: var(--text2); padding: 8px 0;">No learned mappings yet. Change a category in Transactions to teach the app.</div>
+    <div onclick="toggleSettingsSection('sectionDanger', 'arrowDanger')" style="display:flex; align-items:center; justify-content:space-between; cursor:pointer;">
+      <div class="section-label" style="margin-bottom:0; color:var(--red);">Danger zone</div>
+      <span id="arrowDanger" style="color:var(--text3); font-size:18px; transition:transform 0.2s;">›</span>
+    </div>
+    <div id="sectionDanger" style="display:none; margin-top:4px;">
+      <div class="settings-row" onclick="clearData()">
+        <div class="settings-icon">🗑️</div>
+        <div class="settings-info">
+          <div class="settings-title">Clear all data</div>
+          <div class="settings-sub">Remove all transactions and learned categories</div>
+        </div>
+        <div class="settings-arrow">›</div>
+      </div>
     </div>
   </div>
 
-  <div class="card" style="margin-top: 4px;">
-    <div class="section-label">About</div>
-    <div style="font-size: 13px; color: var(--text2); line-height: 1.8;">
-      <div><strong style="color: var(--text);">Spendly</strong> v1.0</div>
-      <div>All data stored locally on your device.</div>
-      <div>Nothing is ever sent to a server.</div>
+  <!-- Learned categories -->
+  <div class="card">
+    <div onclick="toggleSettingsSection('sectionLearned', 'arrowLearned')" style="display:flex; align-items:center; justify-content:space-between; cursor:pointer;">
+      <div class="section-label" style="margin-bottom:0;">Learned categories</div>
+      <span id="arrowLearned" style="color:var(--text3); font-size:18px; transition:transform 0.2s;">›</span>
+    </div>
+    <div id="sectionLearned" style="display:none; margin-top:14px;">
+      <div id="learnedList">
+        <div style="font-size:13px; color:var(--text2); padding:8px 0;">No learned mappings yet. Change a category in Transactions to teach the app.</div>
+      </div>
     </div>
   </div>
+
+  <!-- About -->
+  <div class="card" style="margin-top:4px;">
+    <div onclick="toggleSettingsSection('sectionAbout', 'arrowAbout')" style="display:flex; align-items:center; justify-content:space-between; cursor:pointer;">
+      <div class="section-label" style="margin-bottom:0;">About</div>
+      <span id="arrowAbout" style="color:var(--text3); font-size:18px; transition:transform 0.2s;">›</span>
+    </div>
+    <div id="sectionAbout" style="display:none; margin-top:14px;">
+      <div style="font-size:13px; color:var(--text2); line-height:1.8;">
+        <div><strong style="color:var(--text);">Spendly</strong> v1.0</div>
+        <div>All data stored locally on your device.</div>
+        <div>Nothing is ever sent to a server.</div>
+      </div>
+    </div>
+  </div>
+
 </div>
 
 <!-- CATEGORY MANAGEMENT SHEET -->
@@ -1093,7 +1124,7 @@
 
   <!-- Offset Benefit Card -->
   <div class="card" id="offsetCard" style="display:none; margin-bottom:16px;">
-    <div class="section-label">Offset benefit</div>
+    <div class="section-label">Redraw benefit</div>
     <div id="offsetSummary"></div>
   </div>
 
@@ -1121,14 +1152,9 @@
         display:flex; align-items:center; justify-content:center; flex-shrink:0;
       ">‹</button>
       <div class="sheet-title" style="margin-bottom:0;">Mortgage details</div>
-      <button onclick="saveMortgage()" style="
-        margin-left:auto; padding:6px 16px; border-radius:10px; border:none;
-        background:var(--accent); color:#0a0a0a; font-family:var(--font);
-        font-size:13px; font-weight:600; cursor:pointer; flex-shrink:0;
-      ">Save</button>
     </div>
 
-    <div class="field-label">Loan balance</div>
+    <div class="field-label">Home loan amount</div>
     <div style="position:relative; margin-bottom:16px;">
       <span style="position:absolute; left:14px; top:50%; transform:translateY(-50%); color:var(--text2); font-size:15px;">$</span>
       <input id="m-balance" type="text" inputmode="decimal" placeholder="0.00" style="
@@ -1138,7 +1164,7 @@
       ">
     </div>
 
-    <div class="field-label">Offset account balance</div>
+    <div class="field-label">Total redraw balance</div>
     <div style="position:relative; margin-bottom:16px;">
       <span style="position:absolute; left:14px; top:50%; transform:translateY(-50%); color:var(--text2); font-size:15px;">$</span>
       <input id="m-offset" type="text" inputmode="decimal" placeholder="0.00" style="
@@ -1413,11 +1439,17 @@ function dismissRecoveryCode() {
 // ─── COLLAPSIBLE CATEGORY SECTION ─────────────────────────────────────────────
 let catSectionOpen = false;
 
+function toggleSettingsSection(sectionId, arrowId) {
+  const section = document.getElementById(sectionId);
+  const arrow = document.getElementById(arrowId);
+  const isOpen = section.style.display !== 'none';
+  section.style.display = isOpen ? 'none' : 'block';
+  if (arrow) arrow.style.transform = isOpen ? '' : 'rotate(90deg)';
+  if (!isOpen && sectionId === 'sectionCategories') renderCatOrderList();
+}
+
 function toggleCatSection() {
-  catSectionOpen = !catSectionOpen;
-  document.getElementById('catSection').style.display = catSectionOpen ? 'block' : 'none';
-  document.getElementById('catSectionArrow').style.transform = catSectionOpen ? 'rotate(90deg)' : '';
-  if (catSectionOpen) renderCatOrderList();
+  toggleSettingsSection('sectionCategories', 'arrowCategories');
 }
 
 function initLock() {
@@ -3096,7 +3128,32 @@ const PROPERTY_KEY = 'spendly_property';
 const PROPERTY_CATS = ['Rates', 'Home insurance', 'Home maintenance', 'Body corporate'];
 
 function loadMortgage() {
-  try { return JSON.parse(localStorage.getItem(PROPERTY_KEY) || 'null'); } catch(e) { return null; }
+  try {
+    const m = JSON.parse(localStorage.getItem(PROPERTY_KEY) || 'null');
+    if (!m) return null;
+    // Migration: if old data has original != balance, clear original so balance is used
+    if (m.original && m.original !== m.balance) { delete m.original; }
+    return m;
+  } catch(e) { return null; }
+}
+
+function resetMortgageData() {
+  const m = loadMortgage() || {};
+  // Keep enabled/startDate/term but wipe all financial fields
+  const clean = {
+    enabled: m.enabled || true,
+    balance: 0,
+    offset: 0,
+    rate: 0,
+    repayment: 0,
+    startDate: m.startDate || '',
+    term: m.term || 30
+  };
+  delete clean.original;
+  saveMortgageData(clean);
+  renderPropertyPage();
+  openMortgageEditor();
+  showToast('✓ Data cleared — enter your details');
 }
 
 function saveMortgageData(data) {
@@ -3114,7 +3171,12 @@ function togglePropertyTab() {
   saveMortgageData(m);
   updatePropertyNav();
   renderPropertySettings();
-  showToast(m.enabled ? '✓ Property tab enabled' : 'Property tab hidden');
+  if (m.enabled) {
+    showToast('✓ Property tab enabled');
+    openMortgageEditor();
+  } else {
+    showToast('Property tab hidden');
+  }
 }
 
 function disableProperty() {
@@ -3163,6 +3225,7 @@ function saveMortgage() {
   const m = loadMortgage() || {};
   m.enabled   = true;
   m.balance   = parseFloat(document.getElementById('m-balance').value.replace(/,/g, ''))   || 0;
+  delete m.original;
   m.offset    = parseFloat(document.getElementById('m-offset').value.replace(/,/g, ''))    || 0;
   m.rate      = parseFloat(document.getElementById('m-rate').value.replace(/,/g, ''))      || 0;
   m.repayment = parseFloat(document.getElementById('m-repayment').value.replace(/,/g, '')) || 0;
@@ -3176,7 +3239,7 @@ function saveMortgage() {
 
 function renderPropertyPage() {
   const m = loadMortgage();
-  if (!m || !m.balance) {
+  if (!m || !m.balance || m.balance === 0) {
     document.getElementById('mortgageSummary').innerHTML = `
       <div style="text-align:center; padding:20px 0; color:var(--text2); font-size:14px;">
         Tap Edit to enter your mortgage details
@@ -3187,71 +3250,86 @@ function renderPropertyPage() {
     return;
   }
 
-  const effective = Math.max(0, m.balance - (m.offset || 0));
+  const currentBalance = m.balance;
+  const redraw = m.offset || 0;
+  const effectiveBalance = Math.max(0, currentBalance - redraw);
   const monthlyRate = m.rate / 100 / 12;
-  const monthlyInterest = effective * monthlyRate;
+  const monthlyInterest = effectiveBalance * monthlyRate;
   const monthlyPrincipal = Math.max(0, m.repayment - monthlyInterest);
 
-  // Years remaining
+  // Years remaining — simulate on full loan balance, redraw reduces interest each month
   let yearsRemaining = '—';
-  if (m.repayment > monthlyInterest && effective > 0) {
-    const months = Math.log(m.repayment / (m.repayment - effective * monthlyRate)) / Math.log(1 + monthlyRate);
-    yearsRemaining = isFinite(months) ? `${Math.ceil(months / 12)} yrs` : '—';
+  if (m.repayment > monthlyInterest && currentBalance > 0) {
+    let bal = currentBalance;
+    let months = 0;
+    while (bal > 0.01 && months < 1200) {
+      const effBal = Math.max(0, bal - redraw);
+      const intCharge = effBal * monthlyRate;
+      const prin = m.repayment - intCharge;
+      if (prin <= 0) break;
+      bal -= prin;
+      months++;
+    }
+    yearsRemaining = months > 0 ? `${(months / 12).toFixed(1)} yrs` : '—';
   }
 
-  // Offset saving
-  const interestWithoutOffset = m.balance * monthlyRate;
-  const offsetSavingMonthly = interestWithoutOffset - monthlyInterest;
-  const offsetSavingYearly = offsetSavingMonthly * 12;
+  // Redraw saving — how much interest is saved vs having no redraw at all
+  // Redraw saving — redraw balance × monthly rate = interest saved
+  const redrawSavingMonthly = redraw * monthlyRate;
+  const redrawSavingYearly = redrawSavingMonthly * 12;
 
   document.getElementById('mortgageSummary').innerHTML = `
-    <div style="display:grid; grid-template-columns:1fr 1fr; gap:12px; margin-bottom:16px;">
+    <div style="display:grid; grid-template-columns:1fr 1fr; gap:10px; margin-bottom:10px;">
       <div style="background:var(--bg3); border-radius:12px; padding:14px;">
-        <div style="font-size:11px; color:var(--text3); text-transform:uppercase; letter-spacing:0.05em; margin-bottom:4px;">Loan balance</div>
-        <div style="font-size:20px; font-weight:600; color:var(--text);">${fmt(m.balance)}</div>
+        <div style="font-size:10px; color:var(--text3); text-transform:uppercase; letter-spacing:0.06em; margin-bottom:5px;">Home loan amount</div>
+        <div style="font-size:18px; font-weight:600; color:var(--text); overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">${fmt(m.balance)}</div>
+        <div style="font-size:11px; color:var(--text3); margin-top:3px;">Original loan</div>
       </div>
       <div style="background:var(--bg3); border-radius:12px; padding:14px;">
-        <div style="font-size:11px; color:var(--text3); text-transform:uppercase; letter-spacing:0.05em; margin-bottom:4px;">Effective balance</div>
-        <div style="font-size:20px; font-weight:600; color:#c8f565;">${fmt(effective)}</div>
+        <div style="font-size:10px; color:var(--text3); text-transform:uppercase; letter-spacing:0.06em; margin-bottom:5px;">Total in redraw</div>
+        <div style="font-size:18px; font-weight:600; color:#c8f565; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">${fmt(redraw)}</div>
+        <div style="font-size:11px; color:var(--text3); margin-top:3px;">Working against loan</div>
       </div>
       <div style="background:var(--bg3); border-radius:12px; padding:14px;">
-        <div style="font-size:11px; color:var(--text3); text-transform:uppercase; letter-spacing:0.05em; margin-bottom:4px;">Monthly interest</div>
-        <div style="font-size:20px; font-weight:600; color:#ff6b6b;">${fmt(monthlyInterest)}</div>
+        <div style="font-size:10px; color:var(--text3); text-transform:uppercase; letter-spacing:0.06em; margin-bottom:5px;">Monthly interest</div>
+        <div style="font-size:18px; font-weight:600; color:#ff6b6b; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">${fmt(monthlyInterest)}</div>
+        <div style="font-size:11px; color:var(--text3); margin-top:3px;">Charged this month</div>
       </div>
       <div style="background:var(--bg3); border-radius:12px; padding:14px;">
-        <div style="font-size:11px; color:var(--text3); text-transform:uppercase; letter-spacing:0.05em; margin-bottom:4px;">Monthly principal</div>
-        <div style="font-size:20px; font-weight:600; color:#c8f565;">${fmt(monthlyPrincipal)}</div>
+        <div style="font-size:10px; color:var(--text3); text-transform:uppercase; letter-spacing:0.06em; margin-bottom:5px;">Monthly principal</div>
+        <div style="font-size:18px; font-weight:600; color:#c8f565; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">${fmt(monthlyPrincipal)}</div>
+        <div style="font-size:11px; color:var(--text3); margin-top:3px;">Off your actual loan</div>
       </div>
     </div>
-    <div style="display:flex; justify-content:space-between; padding:12px 14px; background:var(--bg3); border-radius:12px; margin-bottom:4px;">
-      <span style="font-size:14px; color:var(--text2);">Interest rate</span>
+    <div style="display:flex; justify-content:space-between; align-items:center; padding:12px 14px; background:var(--bg3); border-radius:12px; margin-bottom:8px;">
+      <span style="font-size:13px; color:var(--text2);">Interest rate</span>
       <span style="font-size:14px; font-weight:600; color:var(--text);">${m.rate}%</span>
     </div>
-    <div style="display:flex; justify-content:space-between; padding:12px 14px; background:var(--bg3); border-radius:12px; margin-bottom:4px;">
-      <span style="font-size:14px; color:var(--text2);">Monthly repayment</span>
+    <div style="display:flex; justify-content:space-between; align-items:center; padding:12px 14px; background:var(--bg3); border-radius:12px; margin-bottom:8px;">
+      <span style="font-size:13px; color:var(--text2);">Monthly repayment</span>
       <span style="font-size:14px; font-weight:600; color:var(--text);">${fmt(m.repayment)}</span>
     </div>
-    <div style="display:flex; justify-content:space-between; padding:12px 14px; background:var(--bg3); border-radius:12px;">
-      <span style="font-size:14px; color:var(--text2);">Years remaining</span>
-      <span style="font-size:14px; font-weight:600; color:var(--text);">${yearsRemaining}</span>
+    <div style="display:flex; justify-content:space-between; align-items:center; padding:12px 14px; background:var(--bg3); border-radius:12px;">
+      <span style="font-size:13px; color:var(--text2);">Years remaining</span>
+      <span style="font-size:14px; font-weight:600; color:#c8f565;">${yearsRemaining}</span>
     </div>
   `;
 
-  // Offset card
-  if (m.offset > 0) {
+  // Redraw benefit card
+  if (redraw > 0) {
     document.getElementById('offsetCard').style.display = '';
     document.getElementById('offsetSummary').innerHTML = `
       <div style="display:flex; justify-content:space-between; padding:10px 0; border-bottom:0.5px solid var(--border);">
-        <span style="font-size:14px; color:var(--text2);">Offset balance</span>
-        <span style="font-size:14px; font-weight:600; color:var(--text);">${fmt(m.offset)}</span>
+        <span style="font-size:14px; color:var(--text2);">Redraw balance</span>
+        <span style="font-size:14px; font-weight:600; color:var(--text);">${fmt(redraw)}</span>
       </div>
       <div style="display:flex; justify-content:space-between; padding:10px 0; border-bottom:0.5px solid var(--border);">
-        <span style="font-size:14px; color:var(--text2);">Saving per month</span>
-        <span style="font-size:14px; font-weight:600; color:#c8f565;">${fmt(offsetSavingMonthly)}</span>
+        <span style="font-size:14px; color:var(--text2);">Interest saved per month</span>
+        <span style="font-size:14px; font-weight:600; color:#c8f565;">${fmt(redrawSavingMonthly)}</span>
       </div>
       <div style="display:flex; justify-content:space-between; padding:10px 0;">
-        <span style="font-size:14px; color:var(--text2);">Saving per year</span>
-        <span style="font-size:14px; font-weight:600; color:#c8f565;">${fmt(offsetSavingYearly)}</span>
+        <span style="font-size:14px; color:var(--text2);">Interest saved per year</span>
+        <span style="font-size:14px; font-weight:600; color:#c8f565;">${fmt(redrawSavingYearly)}</span>
       </div>
     `;
   } else {
@@ -3783,6 +3861,21 @@ function renderAnalyticsCharts() {
 }
 
 // ─── INIT ──────────────────────────────────────────────────────────────────────
+
+// Remove any stale 'original' key from old data format
+(function migratePropertyData() {
+  try {
+    const raw = localStorage.getItem(PROPERTY_KEY);
+    if (!raw) return;
+    const m = JSON.parse(raw);
+    if (!m) return;
+    if ('original' in m) {
+      delete m.original;
+      localStorage.setItem(PROPERTY_KEY, JSON.stringify(m));
+    }
+  } catch(e) {}
+})();
+
 initCustomDates();
 // Set latest month as default
 if (DB.transactions.length) {
