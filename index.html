@@ -55,16 +55,16 @@
   button, a, [onclick] { touch-action: manipulation; }
   html {
     background: var(--bg);
-    height: -webkit-fill-available;
+    height: 100%;
     -webkit-text-size-adjust: 100%;
   }
   body {
     font-family: var(--font);
     background: var(--bg);
     color: var(--text);
-    min-height: 100vh;
-    min-height: -webkit-fill-available;
+    height: 100%;
     overflow-x: hidden;
+    overflow-y: auto;
     padding-bottom: calc(80px + var(--safe));
   }
 
@@ -79,8 +79,9 @@
     display: flex;
     padding: 10px 0 calc(10px + var(--safe));
     z-index: 100;
-    transform: translateZ(0);
-    -webkit-transform: translateZ(0);
+    transform: translate3d(0,0,0);
+    -webkit-transform: translate3d(0,0,0);
+    will-change: transform;
   }
   .nav-btn {
     flex: 1; display: flex; flex-direction: column; align-items: center;
@@ -3957,6 +3958,19 @@ renderInsights();
 renderUploadHistory();
 initLock();
 resetTimeoutTimer();
+
+// ─── iOS KEYBOARD NAV FIX ─────────────────────────────────────────────────────
+// Prevent the nav bar jumping when keyboard appears/disappears on iOS
+if (window.visualViewport) {
+  const nav = document.getElementById('mainNav');
+  const updateNav = () => {
+    const vv = window.visualViewport;
+    const offset = window.innerHeight - vv.height - vv.offsetTop;
+    nav.style.transform = `translate3d(0, ${-offset}px, 0)`;
+  };
+  window.visualViewport.addEventListener('resize', updateNav);
+  window.visualViewport.addEventListener('scroll', updateNav);
+}
 
 // ─── SERVICE WORKER ───────────────────────────────────────────────────────────
 if ('serviceWorker' in navigator) {
