@@ -2025,13 +2025,12 @@ function parseCSV(text) {
   }
 
   // ── CommBank detection ──
-  // No header row. Format: Date, Amount (with -$ prefix), Description, Balance
-  // e.g. 9/04/2026,-$9.36,COLES 4653 SOUTHPORT," $2,614.25"
-  const isCommBank = !firstLine.includes('date') &&
-    !firstLine.includes('account') &&
-    /^\d{1,2}\/\d{2}\/\d{4}/.test(allLines[0]) &&
-    splitCSVLine(allLines[0])[1]?.replace(/"/g,'').trim().startsWith('-$') ||
-    splitCSVLine(allLines[0])[1]?.replace(/"/g,'').trim().startsWith('$');
+  // No header row. Format: Date, Amount, Description, Balance
+  // Amount is plain number (-9.36) or with $ prefix (-$9.36)
+  const cbCols = allLines[0].split(',');
+  const cbDate = (cbCols[0] || '').replace(/"/g,'').trim();
+  const cbAmt  = (cbCols[1] || '').replace(/["$,\s]/g,'').trim();
+  const isCommBank = /^\d{1,2}\/\d{2}\/\d{4}$/.test(cbDate) && /^-?[\d]+\.?\d*$/.test(cbAmt);
 
   if (isCommBank) {
     const rows = [];
@@ -2040,7 +2039,6 @@ function parseCSV(text) {
       if (cols.length < 3) continue;
 
       const date = cols[0]?.replace(/"/g,'').trim();
-      // Amount: strip -$, $, commas, quotes — negative = debit
       const rawAmt = cols[1]?.replace(/["$,\s]/g,'').trim();
       const amount = parseFloat(rawAmt) || 0;
       const rawDesc = cols[2]?.replace(/"/g,'').trim();
@@ -2052,12 +2050,14 @@ function parseCSV(text) {
 
       const isDebit = amount < 0;
 
-      // Clean CommBank descriptions — strip card suffix, value date and location suffixes
+      // Clean CommBank descriptions — strip location suffixes, card numbers, value dates
       let merchant = rawDesc
         .replace(/\s+Card xx\d+/i, '')
         .replace(/\s+Value Date:\s+\d{2}\/\d{2}\/\d{4}/i, '')
-        .replace(/\s+[A-Z]{2,3}\s+AUS$/i, '')
-        .replace(/\s+AUS$/i, '')
+        .replace(/\s+\d{4,}$/, '')
+        .replace(/\s+(QLD|NSW|VIC|WA|SA|TAS|ACT|NT)\s+AU[S]?$/i, '')
+        .replace(/\s+AU[S]?$/i, '')
+        .replace(/AU[S]?$/i, '')
         .replace(/\s+/g, ' ')
         .trim();
 
