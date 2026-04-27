@@ -1264,11 +1264,11 @@
       <div style="font-size:12px; color:var(--text2); margin-bottom:20px;" id="sheetLearnNote"></div>
       <button class="btn btn-secondary" onclick="closeTxnSheet()" style="touch-action:manipulation; margin-bottom:10px;">Done</button>
       <button id="sheetDeleteBtn" onclick="deleteManualTxn()" style="
-        display:none; width:100%; padding:14px; border-radius:var(--r);
+        width:100%; padding:14px; border-radius:var(--r);
         border:0.5px solid rgba(255,107,107,0.3); background:rgba(255,107,107,0.08);
         color:#ff6b6b; font-family:var(--font); font-size:14px; font-weight:500;
         cursor:pointer; touch-action:manipulation;
-      ">🗑 Delete this entry</button>
+      ">🗑 Delete this transaction</button>
     </div>
   </div>
 </div>
@@ -2828,8 +2828,8 @@ function openTxnSheet(id) {
   document.getElementById('sheetIconWrap').textContent = c.emoji;
   document.getElementById('sheetLearnNote').textContent = t.manual ? '✏️ Manually added' : t.learned ? '✦ You taught me this category' : 'Change the category to teach the app';
 
-  // Show delete button only for manual entries
-  document.getElementById('sheetDeleteBtn').style.display = t.manual ? 'block' : 'none';
+  // Show delete button for all transactions
+  document.getElementById('sheetDeleteBtn').style.display = 'block';
 
   renderCatPicker(t.category);
 
@@ -2856,13 +2856,13 @@ function closeTxnSheet(e) {
 }
 
 function deleteManualTxn() {
-  if (!confirm('Delete this manually added transaction?')) return;
+  if (!confirm('Delete this transaction?')) return;
   DB.transactions = DB.transactions.filter(t => t.id !== sheetTxnId);
   DB.save();
   closeSheet('txnSheet');
   renderTransactions();
   renderDashboard();
-  showToast('✓ Entry deleted');
+  showToast('✓ Transaction deleted');
 }
 
 let sheetOpenedFromCat = null;
