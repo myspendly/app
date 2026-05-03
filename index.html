@@ -52,11 +52,12 @@
   }
 
   * { box-sizing: border-box; margin: 0; padding: 0; -webkit-tap-highlight-color: transparent; }
-  /* Disable double-tap zoom on all elements but keep pinch zoom */
-  * { touch-action: manipulation; }
-  /* Re-enable panning/pinch zoom on scrollable areas */
+  /* Scrollable areas get pan + pinch zoom */
   .sheet, .page, body { touch-action: pan-y pinch-zoom; }
-  button, a, [onclick], .cat-picker-row, .cat-item, .txn-item, .settings-row, .nav-btn { touch-action: manipulation; }
+  /* All interactive elements get manipulation (disables double-tap zoom, keeps responsiveness) */
+  button, a, [onclick], input, select,
+  .cat-picker-row, .cat-item, .txn-item, .settings-row, .nav-btn,
+  .pin-btn, .sheet-handle, .del-cat-btn, .cat-order-row { touch-action: manipulation; }
   html {
     background: var(--bg);
     height: 100%;
@@ -1026,7 +1027,7 @@
   <div class="sheet" style="max-height:92vh;">
     <div class="sheet-handle"></div>
     <div style="display:flex; align-items:center; gap:12px; margin-bottom:20px;">
-      <button onclick="closeSheet('catEditorSheet'); renderCatOrderList(); renderDashboard();" style="
+      <button ontouchstart="event.preventDefault();closeSheet('catEditorSheet');renderCatOrderList();renderDashboard()" onclick="closeSheet('catEditorSheet');renderCatOrderList();renderDashboard()" style="
         width:44px; height:44px; border-radius:50%; border:0.5px solid var(--border2);
         background:var(--bg3); color:var(--text2); font-size:20px; cursor:pointer;
         display:flex; align-items:center; justify-content:center; flex-shrink:0;
@@ -1069,7 +1070,7 @@
   <div class="sheet">
     <div class="sheet-handle"></div>
     <div style="display:flex; align-items:center; gap:12px; margin-bottom:20px;">
-      <button onclick="closeSheet('deleteCatSheet'); deleteCatTarget=null; setTimeout(()=>openCatEditor(),200);" style="
+      <button ontouchstart="event.preventDefault();closeSheet('deleteCatSheet');deleteCatTarget=null;setTimeout(()=>openCatEditor(),200)" onclick="closeSheet('deleteCatSheet');deleteCatTarget=null;setTimeout(()=>openCatEditor(),200)" style="
         width:44px; height:44px; border-radius:50%; border:0.5px solid var(--border2); touch-action:manipulation; -webkit-tap-highlight-color:transparent;
         background:var(--bg3); color:var(--text2); font-size:18px; cursor:pointer;
         display:flex; align-items:center; justify-content:center; flex-shrink:0;
@@ -1270,11 +1271,10 @@
     <div class="sheet-header">
       <div class="sheet-handle" style="margin-bottom:12px;"></div>
       <div style="display:flex; align-items:center; gap:12px;">
-        <button onclick="closeTxnSheet()" style="
+        <button ontouchstart="event.preventDefault();closeTxnSheet()" onclick="closeTxnSheet()" style="
           width:44px; height:44px; border-radius:50%; border:0.5px solid var(--border2); touch-action:manipulation; -webkit-tap-highlight-color:transparent;
-          background:var(--bg3); color:var(--text2); font-size:18px; cursor:pointer;
+          background:var(--bg3); color:var(--text2); font-size:20px; cursor:pointer;
           display:flex; align-items:center; justify-content:center; flex-shrink:0;
-          touch-action:manipulation;
         ">‹</button>
         <div class="sheet-title" id="sheetMerchant" style="margin-bottom:0; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">Merchant</div>
       </div>
@@ -1329,9 +1329,9 @@
     <div class="sheet-header">
       <div class="sheet-handle" style="margin-bottom:12px;"></div>
       <div style="display:flex; align-items:center; gap:12px;">
-        <button onclick="closeSheet('catSheet')" style="
+        <button ontouchstart="event.preventDefault(); closeSheet('catSheet')" onclick="closeSheet('catSheet')" style="
           width:44px; height:44px; border-radius:50%; border:0.5px solid var(--border2); touch-action:manipulation; -webkit-tap-highlight-color:transparent;
-          background:var(--bg3); color:var(--text2); font-size:18px; cursor:pointer;
+          background:var(--bg3); color:var(--text2); font-size:20px; cursor:pointer;
           display:flex; align-items:center; justify-content:center; flex-shrink:0;
           touch-action:manipulation;
         ">‹</button>
