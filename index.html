@@ -99,7 +99,7 @@
   .nav-btn span { display: none; }
 
   /* PAGES */
-  .page { display: none; padding: 0 16px; padding-top: calc(env(safe-area-inset-top, 0px) + 16px); }
+  .page { display: none; padding: 0 16px; padding-top: calc(env(safe-area-inset-top, 0px) + 16px); padding-bottom: calc(90px + env(safe-area-inset-bottom, 0px)); }
   .page.active { display: block; }
 
   /* HEADER */
@@ -599,9 +599,9 @@
       <div class="metric-change" id="m-biggest-cat">—</div>
     </div>
     <div class="metric-card">
-      <div class="metric-label">Top category</div>
-      <div class="metric-value" style="font-size:20px;" id="m-top-cat">—</div>
-      <div class="metric-change" id="m-top-cat-amt">—</div>
+      <div class="metric-label">Weekly cost of life</div>
+      <div class="metric-value" id="m-weekly-cost">—</div>
+      <div class="metric-change" id="m-weekly-cost-sub">—</div>
     </div>
   </div>
 
@@ -2619,22 +2619,57 @@ function renderDashboard() {
       document.getElementById('m-biggest').textContent = fmt(sorted[0].amount);
       document.getElementById('m-biggest-cat').textContent = sorted[0].merchant;
     }
-    // Top expense category
-    const catTotals = {};
-    expenses.forEach(t => {
-      catTotals[t.category] = (catTotals[t.category]||0) + (t.isDebit ? t.amount : -t.amount);
-    });
-    const topCats = Object.entries(catTotals).sort((a,b)=>b[1]-a[1]);
-    if (topCats.length) {
-      document.getElementById('m-top-cat').textContent = (CATS[topCats[0][0]]?.emoji || '📦') + ' ' + topCats[0][0];
-      document.getElementById('m-top-cat-amt').textContent = fmt(topCats[0][1]);
+
+    // Weekly cost of life — total spend ÷ exact weeks covered by transactions
+    const totalSpend = expenses.filter(t => t.isDebit).reduce((s, t) => s + t.amount, 0)
+                     - expenses.filter(t => !t.isDebit).reduce((s, t) => s + t.amount, 0);
+
+    let weeklyCost = 0;
+    let weeklySubLabel = '';
+
+    if (expenses.length > 0) {
+      if (currentPeriod === 'month') {
+        // Use actual first and last transaction date in the month
+        const dates = allPeriod.map(t => new Date(t.date + 'T00:00:00'));
+        const minDate = new Date(Math.min(...dates));
+        const maxDate = new Date(Math.max(...dates));
+        const daysActual = Math.max(1, (maxDate - minDate) / (1000 * 60 * 60 * 24) + 1);
+
+        // Also get full days in month for comparison
+        const [y, m] = selectedMonth.split('-').map(Number);
+        const daysInMonth = new Date(y, m, 0).getDate();
+
+        const weeksActual = daysActual / 7;
+        weeklyCost = Math.max(0, totalSpend) / weeksActual;
+
+        if (daysActual >= daysInMonth - 1) {
+          // Full month uploaded — show clean label
+          weeklySubLabel = `${daysInMonth} day month · ${weeksActual.toFixed(1)} weeks`;
+        } else {
+          // Partial month — show actual range so user knows
+          const opts = { day: 'numeric', month: 'short' };
+          weeklySubLabel = `${minDate.toLocaleDateString('en-AU', opts)} – ${maxDate.toLocaleDateString('en-AU', opts)} · ${daysActual} days`;
+        }
+      } else {
+        const dates = allPeriod.map(t => new Date(t.date + 'T00:00:00'));
+        const minDate = new Date(Math.min(...dates));
+        const maxDate = new Date(Math.max(...dates));
+        const days = Math.max(1, (maxDate - minDate) / (1000 * 60 * 60 * 24) + 1);
+        const weeks = days / 7;
+        weeklyCost = Math.max(0, totalSpend) / weeks;
+        weeklySubLabel = `${Math.round(days)} days of spending`;
+      }
     }
+
+    document.getElementById('m-weekly-cost').textContent = weeklyCost > 0 ? fmt(weeklyCost) : '—';
+    document.getElementById('m-weekly-cost-sub').textContent = weeklySubLabel;
+
     renderCatBreakdown(allPeriod);
   } else {
     document.getElementById('m-biggest').textContent = '—';
     document.getElementById('m-biggest-cat').textContent = '—';
-    document.getElementById('m-top-cat').textContent = '—';
-    document.getElementById('m-top-cat-amt').textContent = '—';
+    document.getElementById('m-weekly-cost').textContent = '—';
+    document.getElementById('m-weekly-cost-sub').textContent = 'No data for this period';
     document.getElementById('catBreakdown').innerHTML = '<div style="padding: 20px 0; text-align:center; font-size:13px; color: var(--text2);">No transactions for this period</div>';
   }
 
