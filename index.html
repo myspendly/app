@@ -903,10 +903,19 @@
       <span id="arrowBackup" style="color:var(--text3); font-size:18px; transition:transform 0.2s;">›</span>
     </div>
     <div id="sectionBackup" style="display:none; margin-top:4px;">
+      <div class="settings-row" onclick="restoreAutoBackup()">
+        <div class="settings-icon">🔄</div>
+        <div class="settings-info">
+          <div class="settings-title">Restore auto-backup</div>
+          <div class="settings-sub" id="autoBackupStatus">Checking...</div>
+        </div>
+        <div class="settings-arrow">›</div>
+      </div>
+
       <div class="settings-row" onclick="exportFullBackup()">
         <div class="settings-icon">💾</div>
         <div class="settings-info">
-          <div class="settings-title">Export full backup</div>
+          <div class="settings-title">Export backup CSV</div>
           <div class="settings-sub">Saves everything — transactions, categories & settings</div>
         </div>
         <div class="settings-arrow">›</div>
@@ -914,8 +923,8 @@
       <div class="settings-row" onclick="document.getElementById('backupFileInput').click()">
         <div class="settings-icon">📲</div>
         <div class="settings-info">
-          <div class="settings-title">Restore from backup</div>
-          <div class="settings-sub">Import a previously exported backup file</div>
+          <div class="settings-title">Import backup CSV</div>
+          <div class="settings-sub">Restore from a previously exported backup file</div>
         </div>
         <div class="settings-arrow">›</div>
       </div>
@@ -931,10 +940,10 @@
       <div style="background:var(--bg3); border-radius:var(--r); padding:14px; margin-top:8px;">
         <div style="font-size:12px; font-weight:600; color:var(--text); margin-bottom:10px;">📱 How to transfer to a new phone</div>
         <div style="font-size:12px; color:var(--text2); line-height:1.9;">
-          <div style="margin-bottom:4px;"><span style="color:var(--accent); font-weight:600;">Step 1</span> &nbsp;On your old phone, tap <strong style="color:var(--text);">Export full backup</strong> above</div>
+          <div style="margin-bottom:4px;"><span style="color:var(--accent); font-weight:600;">Step 1</span> &nbsp;On your old phone, tap <strong style="color:var(--text);">Export backup CSV</strong> above</div>
           <div style="margin-bottom:4px;"><span style="color:var(--accent); font-weight:600;">Step 2</span> &nbsp;Save the file to iCloud Drive or email it to yourself</div>
           <div style="margin-bottom:4px;"><span style="color:var(--accent); font-weight:600;">Step 3</span> &nbsp;On your new phone, open Spendly and go to Settings</div>
-          <div style="margin-bottom:4px;"><span style="color:var(--accent); font-weight:600;">Step 4</span> &nbsp;Tap <strong style="color:var(--text);">Restore from backup</strong> and select your file</div>
+          <div style="margin-bottom:4px;"><span style="color:var(--accent); font-weight:600;">Step 4</span> &nbsp;Tap <strong style="color:var(--text);">Import backup CSV</strong> and select your file</div>
           <div><span style="color:var(--accent); font-weight:600;">Step 5</span> &nbsp;All your data, categories and history will be restored ✓</div>
         </div>
       </div>
@@ -1048,19 +1057,31 @@
       background:var(--bg3); border-radius:var(--r); padding:14px; margin-bottom:20px;
       font-size:14px; color:var(--text2); line-height:1.6;
     "></div>
-    <div style="font-size:13px; color:var(--text2); margin-bottom:16px;">All transactions in this category will be moved to <strong style="color:var(--text);">Other</strong>. Your data will never be deleted.</div>
-    <button onclick="deleteCatAction()" style="
-      width:100%; padding:14px; border-radius:var(--r); margin-bottom:10px;
-      border:none; background:#ff6b6b;
-      color:#fff; font-family:var(--font); font-size:14px;
-      font-weight:600; cursor:pointer;
-    ">Delete category</button>
-    <button onclick="closeDeleteCatSheet()" style="
+    <div class="field-label">What to do with transactions in this category?</div>
+    <button onclick="deleteCatAction('move')" style="
       width:100%; padding:14px; border-radius:var(--r); margin-bottom:10px;
       border:0.5px solid var(--border2); background:var(--bg3);
-      color:var(--text2); font-family:var(--font); font-size:14px;
-      font-weight:500; cursor:pointer;
-    ">Cancel</button>
+      color:var(--text); font-family:var(--font); font-size:14px;
+      font-weight:500; cursor:pointer; text-align:left; display:flex; align-items:center; gap:12px;
+    ">
+      <span style="font-size:20px;">📦</span>
+      <div>
+        <div style="font-weight:600;">Move to Other</div>
+        <div style="font-size:12px; color:var(--text2); margin-top:2px;">Keep all transactions, just recategorise them</div>
+      </div>
+    </button>
+    <button onclick="deleteCatAction('delete')" style="
+      width:100%; padding:14px; border-radius:var(--r); margin-bottom:20px;
+      border:0.5px solid rgba(255,107,107,0.3); background:rgba(255,107,107,0.08);
+      color:#ff6b6b; font-family:var(--font); font-size:14px;
+      font-weight:500; cursor:pointer; text-align:left; display:flex; align-items:center; gap:12px;
+    ">
+      <span style="font-size:20px;">🗑️</span>
+      <div>
+        <div style="font-weight:600;">Delete all transactions</div>
+        <div style="font-size:12px; color:rgba(255,107,107,0.7); margin-top:2px;">Permanently removes all transactions in this category</div>
+      </div>
+    </button>
   </div>
 </div>
 
@@ -1799,13 +1820,19 @@ document.addEventListener('click', resetTimeoutTimer);
 const DB = {
   save() { 
     try {
-      localStorage.setItem('spendly_v1', JSON.stringify({ 
+      const data = JSON.stringify({ 
         transactions: this.transactions, 
         learned: this.learned, 
         uploads: this.uploads, 
         customCats: this.customCats, 
         deletedCats: this.deletedCats 
-      })); 
+      });
+      localStorage.setItem('spendly_v1', data);
+      // Always keep a rolling backup — separate key so it can never be overwritten by a bad save
+      if (this.transactions.length > 0) {
+        localStorage.setItem('spendly_backup', data);
+        localStorage.setItem('spendly_backup_time', new Date().toISOString());
+      }
     } catch(e) { console.error('Save failed', e); }
   },
   load() {
@@ -1818,9 +1845,25 @@ const DB = {
       this.uploads = Array.isArray(d.uploads) ? d.uploads : [];
       this.customCats = d.customCats && typeof d.customCats === 'object' ? d.customCats : {};
       this.deletedCats = Array.isArray(d.deletedCats) ? d.deletedCats : [];
+      // If main data is empty but backup has data, auto-restore from backup
+      if (this.transactions.length === 0) {
+        const backup = localStorage.getItem('spendly_backup');
+        if (backup) {
+          const b = JSON.parse(backup);
+          if (Array.isArray(b.transactions) && b.transactions.length > 0) {
+            this.transactions = b.transactions;
+            this.learned = b.learned || {};
+            this.uploads = b.uploads || [];
+            this.customCats = b.customCats || {};
+            this.deletedCats = b.deletedCats || [];
+            // Restore main data from backup
+            localStorage.setItem('spendly_v1', backup);
+            console.log('Auto-restored from backup:', this.transactions.length, 'transactions');
+          }
+        }
+      }
     } catch(e) { 
       console.error('Load failed', e);
-      // Don't wipe data on error — keep whatever was loaded
     }
   },
   transactions: [],
@@ -3079,16 +3122,32 @@ function addNewCategory() {
 let deleteCatTarget = null;
 
 function confirmDeleteCat(name) {
-  deleteCatTarget = name;
   const count = DB.transactions.filter(t => t.category === name).length;
+
+  // If no transactions just delete the category immediately
+  if (count === 0) {
+    delete CATS[name];
+    delete DB.customCats[name];
+    if (!DB.deletedCats.includes(name)) DB.deletedCats.push(name);
+    const order = getOrderedCatNames().filter(n => n !== name);
+    saveCatOrder(order);
+    DB.save();
+    closeSheet('catEditorSheet');
+    renderDashboard();
+    renderTransactions();
+    renderSettings();
+    showToast(`✓ "${name}" deleted`);
+    return;
+  }
+
+  // Has transactions — show the confirmation sheet with options
+  deleteCatTarget = name;
   document.getElementById('deleteCatInfo').innerHTML = `
     You are about to delete <strong style="color:var(--text);">${name}</strong>.<br>
     This category has <strong style="color:var(--text);">${count} transaction${count !== 1 ? 's' : ''}</strong> in it.
   `;
   closeSheet('catEditorSheet');
-  setTimeout(() => {
-    openSheet('deleteCatSheet');
-  }, 200);
+  setTimeout(() => openSheet('deleteCatSheet'), 200);
 }
 
 function closeDeleteCatSheet(e) {
@@ -3103,11 +3162,13 @@ function deleteCatAction(action) {
   const name = deleteCatTarget;
   if (!name) return;
 
-  // Always move transactions to Other — never delete transaction data
-  DB.transactions.forEach(t => { if (t.category === name) t.category = 'Other'; });
-  Object.keys(DB.learned).forEach(k => { if (DB.learned[k] === name) DB.learned[k] = 'Other'; });
+  if (action === 'move') {
+    DB.transactions.forEach(t => { if (t.category === name) t.category = 'Other'; });
+    Object.keys(DB.learned).forEach(k => { if (DB.learned[k] === name) DB.learned[k] = 'Other'; });
+  } else {
+    DB.transactions = DB.transactions.filter(t => t.category !== name);
+  }
 
-  // Remove the category
   delete CATS[name];
   delete DB.customCats[name];
   if (!DB.deletedCats.includes(name)) DB.deletedCats.push(name);
@@ -3126,6 +3187,17 @@ function deleteCatAction(action) {
 }
 
 function renderSettings() {
+  const autoBackupEl = document.getElementById('autoBackupStatus');
+  if (autoBackupEl) {
+    const time = localStorage.getItem('spendly_backup_time');
+    const backup = localStorage.getItem('spendly_backup');
+    if (time && backup) {
+      const b = JSON.parse(backup);
+      autoBackupEl.textContent = `Last saved: ${new Date(time).toLocaleString()} · ${b.transactions?.length || 0} transactions`;
+    } else {
+      autoBackupEl.textContent = 'No auto-backup yet';
+    }
+  }
   const hasPin = !!localStorage.getItem(PIN_KEY);
   const pinStatusEl = document.getElementById('pinStatus');
   if (pinStatusEl) pinStatusEl.textContent = hasPin ? 'PIN is set ✓ — tap to change' : 'Set a 4-digit PIN to lock the app';
@@ -3164,6 +3236,29 @@ function exportData() {
   a.click();
   URL.revokeObjectURL(url);
   showToast('✓ Exported to CSV');
+}
+
+function restoreAutoBackup() {
+  try {
+    const backup = localStorage.getItem('spendly_backup');
+    const time = localStorage.getItem('spendly_backup_time');
+    if (!backup) { showToast('No auto-backup found'); return; }
+    const b = JSON.parse(backup);
+    if (!b.transactions || b.transactions.length === 0) { showToast('Auto-backup is empty'); return; }
+    const timeStr = time ? new Date(time).toLocaleString() : 'unknown time';
+    if (!confirm(`Restore ${b.transactions.length} transactions from auto-backup saved at ${timeStr}?`)) return;
+    DB.transactions = b.transactions;
+    DB.learned = b.learned || {};
+    DB.uploads = b.uploads || [];
+    DB.customCats = b.customCats || {};
+    DB.deletedCats = b.deletedCats || [];
+    localStorage.setItem('spendly_v1', backup);
+    renderDashboard();
+    renderTransactions();
+    showToast(`✓ Restored ${b.transactions.length} transactions`);
+  } catch(e) {
+    showToast('Could not restore backup');
+  }
 }
 
 function exportFullBackup() {
