@@ -309,10 +309,10 @@
 
   /* TOAST */
   .toast {
-    position: fixed; bottom: calc(90px + var(--safe)); left: 50%; transform: translateX(-50%) translateY(20px);
+    position: fixed; top: 20px; left: 50%; transform: translateX(-50%) translateY(-20px);
     background: var(--bg3); color: var(--text); border: 0.5px solid var(--border2);
     border-radius: 100px; padding: 10px 20px; font-size: 13px; font-weight: 500;
-    opacity: 0; transition: all 0.3s; z-index: 300; white-space: nowrap;
+    opacity: 0; transition: all 0.3s; z-index: 9999; white-space: nowrap;
     backdrop-filter: blur(20px); -webkit-backdrop-filter: blur(20px);
   }
   .toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
@@ -1809,7 +1809,7 @@ document.addEventListener('touchstart', resetTimeoutTimer, { passive: true });
 document.addEventListener('click', resetTimeoutTimer);
 
 const DB = {
-  save() { localStorage.setItem('spendly_v1', JSON.stringify({ transactions: this.transactions, learned: this.learned, uploads: this.uploads, customCats: this.customCats })); },
+  save() { localStorage.setItem('spendly_v1', JSON.stringify({ transactions: this.transactions, learned: this.learned, uploads: this.uploads, customCats: this.customCats, deletedCats: this.deletedCats })); },
   load() {
     try {
       const d = JSON.parse(localStorage.getItem('spendly_v1') || '{}');
@@ -1817,14 +1817,18 @@ const DB = {
       this.learned = d.learned || {};
       this.uploads = d.uploads || [];
       this.customCats = d.customCats || {};
-    } catch(e) { this.transactions = []; this.learned = {}; this.uploads = []; this.customCats = {}; }
+      this.deletedCats = d.deletedCats || [];
+    } catch(e) { this.transactions = []; this.learned = {}; this.uploads = []; this.customCats = {}; this.deletedCats = []; }
   },
   transactions: [],
   learned: {},
   uploads: [],
-  customCats: {}
+  customCats: {},
+  deletedCats: []
 };
 DB.load();
+// Remove any previously deleted default categories from CATS
+DB.deletedCats.forEach(n => { delete CATS[n]; });
 
 // ─── CATEGORIES ────────────────────────────────────────────────────────────────
 const CATS = {
@@ -1869,7 +1873,7 @@ DB.transactions.forEach(t => {
 DB.save();
 
 // CAT_NAMES is now dynamic — always reflects current CATS
-function getCatNames() { return Object.keys(CATS); }
+function getCatNames() { return Object.keys(CATS).filter(n => !DB.deletedCats.includes(n)); }
 const CAT_NAMES = getCatNames(); // kept for backwards compat but use getCatNames() going forward
 
 // ─── SMART AI CATEGORISER ─────────────────────────────────────────────────────
@@ -2568,7 +2572,7 @@ function renderCatBreakdown(txns) {
     const isIncome = cat === 'Income';
     const isTransfer = cat === 'Transfers';
     const netAmt = data.total;
-    const refundNote = data.credits > 0 ? ` <span style="font-size:10px; color:#c8f565;">(${data.credits} refund${data.credits>1?'s':''})</span>` : '';
+    const refundNote = (data.credits > 0 && cat !== 'Transfers') ? ` <span style="font-size:10px; color:#c8f565;">(${data.credits} refund${data.credits>1?'s':''})</span>` : '';
 
     // Budget
     const budgets = getBudgets();
@@ -3108,6 +3112,7 @@ function deleteCatAction(action) {
   // Remove the category
   delete CATS[name];
   delete DB.customCats[name];
+  if (!DB.deletedCats.includes(name)) DB.deletedCats.push(name);
   const order = getOrderedCatNames().filter(n => n !== name);
   saveCatOrder(order);
   DB.save();
