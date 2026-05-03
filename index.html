@@ -417,7 +417,7 @@
 ">
   <div style="width:100%; display:flex; justify-content:flex-start; margin-bottom:20px;">
     <button onclick="hidePinRecovery()" style="
-      width:36px; height:36px; border-radius:50%; border:0.5px solid #333;
+      width:44px; height:44px; border-radius:50%; border:0.5px solid #333; touch-action:manipulation; -webkit-tap-highlight-color:transparent;
       background:#1e1e1e; color:#888; font-size:18px; cursor:pointer;
       display:flex; align-items:center; justify-content:center;
     ">‹</button>
@@ -448,7 +448,7 @@
 ">
   <div style="width:100%; display:flex; justify-content:flex-start; margin-bottom:20px;">
     <button onclick="skipPin()" style="
-      width:36px; height:36px; border-radius:50%; border:0.5px solid #333;
+      width:44px; height:44px; border-radius:50%; border:0.5px solid #333; touch-action:manipulation; -webkit-tap-highlight-color:transparent;
       background:#1e1e1e; color:#888; font-size:18px; cursor:pointer;
       display:flex; align-items:center; justify-content:center;
     ">‹</button>
@@ -1008,9 +1008,10 @@
     <div class="sheet-handle"></div>
     <div style="display:flex; align-items:center; gap:12px; margin-bottom:20px;">
       <button onclick="closeCatEditor()" style="
-        width:36px; height:36px; border-radius:50%; border:0.5px solid var(--border2);
-        background:var(--bg3); color:var(--text2); font-size:18px; cursor:pointer;
+        width:44px; height:44px; border-radius:50%; border:0.5px solid var(--border2);
+        background:var(--bg3); color:var(--text2); font-size:20px; cursor:pointer;
         display:flex; align-items:center; justify-content:center; flex-shrink:0;
+        touch-action:manipulation; -webkit-tap-highlight-color:transparent;
       ">‹</button>
       <div class="sheet-title" style="margin-bottom:0;">Edit categories</div>
     </div>
@@ -1050,7 +1051,7 @@
     <div class="sheet-handle"></div>
     <div style="display:flex; align-items:center; gap:12px; margin-bottom:20px;">
       <button onclick="closeDeleteCatSheet()" style="
-        width:36px; height:36px; border-radius:50%; border:0.5px solid var(--border2);
+        width:44px; height:44px; border-radius:50%; border:0.5px solid var(--border2); touch-action:manipulation; -webkit-tap-highlight-color:transparent;
         background:var(--bg3); color:var(--text2); font-size:18px; cursor:pointer;
         display:flex; align-items:center; justify-content:center; flex-shrink:0;
       ">‹</button>
@@ -1166,7 +1167,7 @@
     <div class="sheet-handle"></div>
     <div style="display:flex; align-items:center; gap:12px; margin-bottom:20px;">
       <button onclick="closeMortgageEditor()" style="
-        width:36px; height:36px; border-radius:50%; border:0.5px solid var(--border2);
+        width:44px; height:44px; border-radius:50%; border:0.5px solid var(--border2); touch-action:manipulation; -webkit-tap-highlight-color:transparent;
         background:var(--bg3); color:var(--text2); font-size:18px; cursor:pointer;
         display:flex; align-items:center; justify-content:center; flex-shrink:0;
       ">‹</button>
@@ -1251,7 +1252,7 @@
       <div class="sheet-handle" style="margin-bottom:12px;"></div>
       <div style="display:flex; align-items:center; gap:12px;">
         <button onclick="closeTxnSheet()" style="
-          width:36px; height:36px; border-radius:50%; border:0.5px solid var(--border2);
+          width:44px; height:44px; border-radius:50%; border:0.5px solid var(--border2); touch-action:manipulation; -webkit-tap-highlight-color:transparent;
           background:var(--bg3); color:var(--text2); font-size:18px; cursor:pointer;
           display:flex; align-items:center; justify-content:center; flex-shrink:0;
           touch-action:manipulation;
@@ -1310,7 +1311,7 @@
       <div class="sheet-handle" style="margin-bottom:12px;"></div>
       <div style="display:flex; align-items:center; gap:12px;">
         <button onclick="closeCatSheet()" style="
-          width:36px; height:36px; border-radius:50%; border:0.5px solid var(--border2);
+          width:44px; height:44px; border-radius:50%; border:0.5px solid var(--border2); touch-action:manipulation; -webkit-tap-highlight-color:transparent;
           background:var(--bg3); color:var(--text2); font-size:18px; cursor:pointer;
           display:flex; align-items:center; justify-content:center; flex-shrink:0;
           touch-action:manipulation;
@@ -1364,7 +1365,7 @@
       <div class="sheet-handle" style="margin-bottom:12px;"></div>
       <div style="display:flex; align-items:center; gap:12px;">
         <button onclick="closeManualEntry()" style="
-          width:36px; height:36px; border-radius:50%; border:0.5px solid var(--border2);
+          width:44px; height:44px; border-radius:50%; border:0.5px solid var(--border2); touch-action:manipulation; -webkit-tap-highlight-color:transparent;
           background:var(--bg3); color:var(--text2); font-size:18px; cursor:pointer;
           display:flex; align-items:center; justify-content:center; flex-shrink:0;
           touch-action:manipulation;
@@ -1876,8 +1877,6 @@ const DB = {
   deletedCats: []
 };
 DB.load();
-// Remove any previously deleted default categories from CATS
-if (Array.isArray(DB.deletedCats)) DB.deletedCats.forEach(n => { delete CATS[n]; });
 
 // ─── CATEGORIES ────────────────────────────────────────────────────────────────
 const CATS = {
@@ -1905,17 +1904,19 @@ const CATS = {
   'Other':           { emoji: '📦', color: '#555', dim: 'rgba(85,85,85,0.15)' },
 };
 
-// Apply any saved custom categories
+// Apply saved custom categories
 Object.entries(DB.customCats).forEach(([name, cat]) => { CATS[name] = cat; });
 
-// Safety net — rebuild any categories found in transactions but missing from CATS
-// This recovers categories like Fuel that may have been lost
+// Remove deleted categories — must happen AFTER CATS is defined
+if (Array.isArray(DB.deletedCats)) DB.deletedCats.forEach(n => { delete CATS[n]; });
+
+// Safety net — rebuild categories found in transactions but missing from CATS
+// BUT never rebuild a deleted category
 const colors = ['#80cbc4','#ffb74d','#f06292','#aed581','#7986cb','#4db6ac','#ff8a65'];
 DB.transactions.forEach(t => {
-  if (t.category && !CATS[t.category]) {
+  if (t.category && !CATS[t.category] && !DB.deletedCats.includes(t.category)) {
     const col = colors[Object.keys(CATS).length % colors.length];
     CATS[t.category] = { emoji: '📁', color: col, dim: col + '26' };
-    // Also save it to customCats so it persists
     DB.customCats[t.category] = CATS[t.category];
   }
 });
