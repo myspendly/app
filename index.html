@@ -1151,7 +1151,7 @@
 <div class="page" id="page-property">
   <div class="page-header">
     <h1>Property</h1>
-    <p id="propertySubtitle">Your mortgage & home costs</p>
+    <p id="propertySubtitle">Your mortgage details</p>
   </div>
 
   <!-- Mortgage Overview Card -->
@@ -1174,7 +1174,7 @@
 
   <!-- Offset Benefit Card -->
   <div class="card" id="offsetCard" style="display:none; margin-bottom:16px;">
-    <div class="section-label">Redraw benefit</div>
+    <div class="section-label">Redraw / offset benefit</div>
     <div id="offsetSummary"></div>
   </div>
 
@@ -1182,12 +1182,6 @@
   <div class="card" id="financialHealthCard" style="margin-bottom:16px;">
     <div class="section-label">Financial health</div>
     <div id="financialHealthContent"></div>
-  </div>
-
-  <!-- House Costs This Month -->
-  <div class="card">
-    <div class="section-label" id="houseCostsLabel">House costs this month</div>
-    <div id="houseCostsList"></div>
   </div>
 </div>
 
@@ -1204,8 +1198,8 @@
       <div class="sheet-title" style="margin-bottom:0;">Mortgage details</div>
     </div>
 
-    <div class="field-label">Home loan amount</div>
-    <div style="position:relative; margin-bottom:16px;">
+    <div class="field-label">Original loan amount</div>
+    <div style="position:relative; margin-bottom:4px;">
       <span style="position:absolute; left:14px; top:50%; transform:translateY(-50%); color:var(--text2); font-size:16px;">$</span>
       <input id="m-balance" type="text" inputmode="decimal" placeholder="0.00" style="
         width:100%; padding:13px 14px 13px 28px; border-radius:var(--r);
@@ -1213,6 +1207,7 @@
         color:var(--text); font-family:var(--font); font-size:16px; outline:none; box-sizing:border-box;
       ">
     </div>
+    <div style="font-size:11px; color:var(--text3); margin-bottom:16px; padding-left:2px;">Set once at settlement — never changes</div>
 
     <div class="field-label">Total redraw balance</div>
     <div style="position:relative; margin-bottom:16px;">
@@ -3557,14 +3552,36 @@ function closeMortgageEditor(e) {
 function saveMortgage() {
   if (document.activeElement) document.activeElement.blur();
   const m = loadMortgage() || {};
+  const newRate      = parseFloat(document.getElementById('m-rate').value.replace(/,/g, ''))      || 0;
+  const newRepayment = parseFloat(document.getElementById('m-repayment').value.replace(/,/g, '')) || 0;
+
   m.enabled   = true;
   m.balance   = parseFloat(document.getElementById('m-balance').value.replace(/,/g, ''))   || 0;
   delete m.original;
   m.offset    = parseFloat(document.getElementById('m-offset').value.replace(/,/g, ''))    || 0;
-  m.rate      = parseFloat(document.getElementById('m-rate').value.replace(/,/g, ''))      || 0;
-  m.repayment = parseFloat(document.getElementById('m-repayment').value.replace(/,/g, '')) || 0;
   m.startDate = document.getElementById('m-startdate').value;
-  m.term      = parseInt(document.getElementById('m-term').value)        || 30;
+  m.term      = parseInt(document.getElementById('m-term').value) || 30;
+
+  // Track rate/repayment history — if rate or repayment changed, record when
+  if (!m.rateHistory) m.rateHistory = [];
+  const today = new Date().toISOString().split('T')[0];
+  const lastEntry = m.rateHistory[m.rateHistory.length - 1];
+  const rateChanged    = newRate      !== m.rate;
+  const repayChanged   = newRepayment !== m.repayment;
+
+  if (rateChanged || repayChanged || m.rateHistory.length === 0) {
+    // If the last entry is from today, update it instead of adding a new one
+    if (lastEntry && lastEntry.date === today) {
+      lastEntry.rate      = newRate;
+      lastEntry.repayment = newRepayment;
+    } else {
+      m.rateHistory.push({ date: today, rate: newRate, repayment: newRepayment });
+    }
+  }
+
+  m.rate      = newRate;
+  m.repayment = newRepayment;
+
   saveMortgageData(m);
   closeSheet('mortgageSheet');
   renderPropertyPage();
@@ -3579,73 +3596,146 @@ function renderPropertyPage() {
         Tap Edit to enter your mortgage details
       </div>`;
     document.getElementById('offsetCard').style.display = 'none';
-    renderHouseCosts();
+  
     renderFinancialHealth(m);
     return;
   }
 
-  const currentBalance = m.balance;
+  const originalLoan = m.balance;
   const redraw = m.offset || 0;
-  const effectiveBalance = Math.max(0, currentBalance - redraw);
   const monthlyRate = m.rate / 100 / 12;
-  const monthlyInterest = effectiveBalance * monthlyRate;
-  const monthlyPrincipal = Math.max(0, m.repayment - monthlyInterest);
 
-  // Years remaining — simulate on full loan balance, redraw reduces interest each month
+  // Auto-calculate current bank balance using rate history
+  // Each period uses the correct rate and repayment for that time
+  let currentBalance = originalLoan;
+  let autoCalcMonths = 0;
+
+  if (m.startDate && m.repayment && m.rate) {
+    const start = new Date(m.startDate);
+    const now = new Date();
+
+    // Build rate periods from history
+    // rateHistory entries: [{ date, rate, repayment }, ...]
+    const history = (m.rateHistory && m.rateHistory.length > 0)
+      ? [...m.rateHistory].sort((a, b) => a.date.localeCompare(b.date))
+      : [{ date: m.startDate, rate: m.rate, repayment: m.repayment }];
+
+    // Ensure we have an entry from the start date
+    if (history[0].date > m.startDate) {
+      history.unshift({ date: m.startDate, rate: history[0].rate, repayment: history[0].repayment });
+    }
+
+    let bal = originalLoan;
+    let simDate = new Date(m.startDate);
+    simDate.setDate(1); // repayments always hit on 1st
+    simDate.setMonth(simDate.getMonth() + 1); // first repayment is the month after settlement
+
+    const today = new Date();
+    today.setHours(0, 0, 0, 0); // compare dates only, not times
+
+    for (let p = 0; p < history.length; p++) {
+      const periodEnd   = p + 1 < history.length ? new Date(history[p + 1].date) : today;
+      const periodRate  = history[p].rate / 100 / 12;
+      const periodRepay = history[p].repayment;
+
+      // Only apply repayment if the 1st of that month has passed
+      while (simDate <= today && simDate < periodEnd) {
+        const eff = Math.max(0, bal - redraw);
+        const interest = eff * periodRate;
+        const principal = periodRepay - interest;
+        if (principal <= 0) break;
+        bal -= principal;
+        if (bal < 0) bal = 0;
+        autoCalcMonths++;
+        simDate.setMonth(simDate.getMonth() + 1); // advance to next repayment date
+      }
+    }
+
+    currentBalance = Math.max(0, bal);
+  }
+
+  // Effective debt = current calculated balance minus redraw
+  const effectiveDebt = Math.max(0, currentBalance - redraw);
+  const monthlyInterest = effectiveDebt * monthlyRate;
+  const monthlyPrincipal = Math.max(0, m.repayment - monthlyInterest);
+  const principalPaid = originalLoan - currentBalance;
+
+  // Years remaining from current calculated balance
   let yearsRemaining = '—';
   if (m.repayment > monthlyInterest && currentBalance > 0) {
     let bal = currentBalance;
+    let eff = effectiveDebt;
     let months = 0;
     while (bal > 0.01 && months < 1200) {
-      const effBal = Math.max(0, bal - redraw);
-      const intCharge = effBal * monthlyRate;
+      const intCharge = Math.max(0, eff) * monthlyRate;
       const prin = m.repayment - intCharge;
       if (prin <= 0) break;
       bal -= prin;
+      eff -= prin;
+      if (eff < 0) eff = 0;
       months++;
     }
     yearsRemaining = months > 0 ? `${(months / 12).toFixed(1)} yrs` : '—';
   }
 
-  // Redraw saving — how much interest is saved vs having no redraw at all
-  // Redraw saving — redraw balance × monthly rate = interest saved
-  const redrawSavingMonthly = redraw * monthlyRate;
+  // Redraw saving vs no redraw
+  const interestWithoutRedraw = currentBalance * monthlyRate;
+  const redrawSavingMonthly = Math.max(0, interestWithoutRedraw - monthlyInterest);
   const redrawSavingYearly = redrawSavingMonthly * 12;
 
   document.getElementById('mortgageSummary').innerHTML = `
-    <div style="display:grid; grid-template-columns:1fr 1fr; gap:10px; margin-bottom:10px;">
+
+    <!-- 4 key numbers in 2x2 grid — consistent with analytics page -->
+    <div style="display:grid; grid-template-columns:1fr 1fr; gap:10px; margin-bottom:12px;">
+
       <div style="background:var(--bg3); border-radius:12px; padding:14px;">
-        <div style="font-size:10px; color:var(--text3); text-transform:uppercase; letter-spacing:0.06em; margin-bottom:5px;">Home loan amount</div>
-        <div style="font-size:18px; font-weight:600; color:var(--text); overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">${fmt(m.balance)}</div>
-        <div style="font-size:11px; color:var(--text3); margin-top:3px;">Original loan</div>
+        <div style="font-size:10px; color:var(--text3); text-transform:uppercase; letter-spacing:0.06em; margin-bottom:5px;">Total Loan Amount</div>
+        <div style="font-size:18px; font-weight:600; color:var(--text); overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">${fmt(originalLoan)}</div>
+        <div style="font-size:11px; color:var(--text3); margin-top:3px;">Total loan from bank</div>
       </div>
+
       <div style="background:var(--bg3); border-radius:12px; padding:14px;">
-        <div style="font-size:10px; color:var(--text3); text-transform:uppercase; letter-spacing:0.06em; margin-bottom:5px;">Total in redraw</div>
+        <div style="font-size:10px; color:var(--text3); text-transform:uppercase; letter-spacing:0.06em; margin-bottom:5px;">Paid off to date</div>
+        <div style="font-size:18px; font-weight:600; color:#c8f565; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">${fmt(principalPaid)}</div>
+        <div style="font-size:11px; color:var(--text3); margin-top:3px;">Principal only</div>
+      </div>
+
+      <div style="background:var(--bg3); border-radius:12px; padding:14px;">
+        <div style="font-size:10px; color:var(--text3); text-transform:uppercase; letter-spacing:0.06em; margin-bottom:5px;">Redraw / offset</div>
         <div style="font-size:18px; font-weight:600; color:#c8f565; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">${fmt(redraw)}</div>
-        <div style="font-size:11px; color:var(--text3); margin-top:3px;">Working against loan</div>
+        <div style="font-size:11px; color:var(--text3); margin-top:3px;">Sitting against loan</div>
       </div>
-      <div style="background:var(--bg3); border-radius:12px; padding:14px;">
-        <div style="font-size:10px; color:var(--text3); text-transform:uppercase; letter-spacing:0.06em; margin-bottom:5px;">Monthly interest</div>
-        <div style="font-size:18px; font-weight:600; color:#ff6b6b; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">${fmt(monthlyInterest)}</div>
-        <div style="font-size:11px; color:var(--text3); margin-top:3px;">Charged this month</div>
+
+      <div style="background:rgba(100,181,246,0.12); border-radius:12px; padding:14px; border:0.5px solid rgba(100,181,246,0.25);">
+        <div style="font-size:10px; color:#64b5f6; text-transform:uppercase; letter-spacing:0.06em; margin-bottom:5px;">Effective loan</div>
+        <div style="font-size:18px; font-weight:600; color:#64b5f6; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">${fmt(effectiveDebt)}</div>
+        <div style="font-size:11px; color:var(--text3); margin-top:3px;">Interest charged on this</div>
       </div>
-      <div style="background:var(--bg3); border-radius:12px; padding:14px;">
-        <div style="font-size:10px; color:var(--text3); text-transform:uppercase; letter-spacing:0.06em; margin-bottom:5px;">Monthly principal</div>
-        <div style="font-size:18px; font-weight:600; color:#c8f565; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">${fmt(monthlyPrincipal)}</div>
-        <div style="font-size:11px; color:var(--text3); margin-top:3px;">Off your actual loan</div>
+
+    </div>
+
+    <!-- Clear loan detail rows -->
+    <div style="background:var(--bg3); border-radius:12px; overflow:hidden; margin-top:8px;">
+      <div style="display:flex; justify-content:space-between; align-items:center; padding:14px 16px; border-bottom:0.5px solid var(--border);">
+        <span style="font-size:14px; color:var(--text2);">Interest rate</span>
+        <span style="font-size:15px; font-weight:600; color:var(--text);">${m.rate}%</span>
       </div>
-    </div>
-    <div style="display:flex; justify-content:space-between; align-items:center; padding:12px 14px; background:var(--bg3); border-radius:12px; margin-bottom:8px;">
-      <span style="font-size:13px; color:var(--text2);">Interest rate</span>
-      <span style="font-size:14px; font-weight:600; color:var(--text);">${m.rate}%</span>
-    </div>
-    <div style="display:flex; justify-content:space-between; align-items:center; padding:12px 14px; background:var(--bg3); border-radius:12px; margin-bottom:8px;">
-      <span style="font-size:13px; color:var(--text2);">Monthly repayment</span>
-      <span style="font-size:14px; font-weight:600; color:var(--text);">${fmt(m.repayment)}</span>
-    </div>
-    <div style="display:flex; justify-content:space-between; align-items:center; padding:12px 14px; background:var(--bg3); border-radius:12px;">
-      <span style="font-size:13px; color:var(--text2);">Years remaining</span>
-      <span style="font-size:14px; font-weight:600; color:#c8f565;">${yearsRemaining}</span>
+      <div style="display:flex; justify-content:space-between; align-items:center; padding:14px 16px; border-bottom:0.5px solid var(--border);">
+        <span style="font-size:14px; color:var(--text2);">Monthly repayment</span>
+        <span style="font-size:15px; font-weight:600; color:var(--text);">${fmt(m.repayment)}</span>
+      </div>
+      <div style="display:flex; justify-content:space-between; align-items:center; padding:14px 16px; border-bottom:0.5px solid var(--border);">
+        <span style="font-size:14px; color:var(--text2);">Monthly interest</span>
+        <span style="font-size:15px; font-weight:600; color:#ff6b6b;">${fmt(monthlyInterest)}</span>
+      </div>
+      <div style="display:flex; justify-content:space-between; align-items:center; padding:14px 16px; border-bottom:0.5px solid var(--border);">
+        <span style="font-size:14px; color:var(--text2);">Monthly to principal</span>
+        <span style="font-size:15px; font-weight:600; color:#c8f565;">${fmt(monthlyPrincipal)}</span>
+      </div>
+      <div style="display:flex; justify-content:space-between; align-items:center; padding:14px 16px;">
+        <span style="font-size:14px; color:var(--text2);">Years remaining</span>
+        <span style="font-size:15px; font-weight:600; color:#64b5f6;">${yearsRemaining}</span>
+      </div>
     </div>
   `;
 
@@ -3654,7 +3744,7 @@ function renderPropertyPage() {
     document.getElementById('offsetCard').style.display = '';
     document.getElementById('offsetSummary').innerHTML = `
       <div style="display:flex; justify-content:space-between; padding:10px 0; border-bottom:0.5px solid var(--border);">
-        <span style="font-size:14px; color:var(--text2);">Redraw balance</span>
+        <span style="font-size:14px; color:var(--text2);">Redraw / offset balance</span>
         <span style="font-size:14px; font-weight:600; color:var(--text);">${fmt(redraw)}</span>
       </div>
       <div style="display:flex; justify-content:space-between; padding:10px 0; border-bottom:0.5px solid var(--border);">
@@ -3670,7 +3760,7 @@ function renderPropertyPage() {
     document.getElementById('offsetCard').style.display = 'none';
   }
 
-  renderHouseCosts();
+
   renderFinancialHealth(m);
 }
 
@@ -3683,30 +3773,39 @@ function renderFinancialHealth(m) {
     return;
   }
 
-  // ── All-time averages — exclude Rent and Transfers ──
+  // Mortgage repayment always comes from property settings — updates automatically when rate changes
+  const mortgageRepayment = m.repayment;
+
+  // Build monthly map — exclude Transfers and Rent from ALL calculations
+  // Rent is excluded because the mortgage replaces rent as the housing cost
   const allMonthMap = {};
   DB.transactions.forEach(t => {
-    if (t.category === 'Transfers' || t.category === 'Rent') return;
+    if (t.category === 'Transfers') return; // never include transfers
+    if (t.category === 'Rent') return;      // excluded — mortgage covers housing
     const key = t.date.substring(0, 7);
     if (!allMonthMap[key]) allMonthMap[key] = { income: 0, spend: 0 };
-    if (t.category === 'Income') allMonthMap[key].income += t.amount;
-    else allMonthMap[key].spend += t.isDebit ? t.amount : -t.amount;
+    if (t.category === 'Income') {
+      allMonthMap[key].income += t.amount;
+    } else {
+      // All other categories = living expenses
+      allMonthMap[key].spend += t.isDebit ? t.amount : -t.amount;
+    }
   });
-  const allMonths = Object.keys(allMonthMap);
-  const n = allMonths.length || 1;
-  const avgIncome  = allMonths.reduce((s, k) => s + allMonthMap[k].income, 0) / n;
-  const avgSpend   = allMonths.reduce((s, k) => s + allMonthMap[k].spend,  0) / n;
-  const avgLeft    = avgIncome - m.repayment - avgSpend;
 
-  // ── This month — exclude Rent ──
+  const allMonths = Object.keys(allMonthMap).sort();
+  const n = allMonths.length || 1;
+  const avgIncome = allMonths.reduce((s, k) => s + allMonthMap[k].income, 0) / n;
+  const avgSpend  = allMonths.reduce((s, k) => s + allMonthMap[k].spend,  0) / n;
+  const avgLeft   = avgIncome - mortgageRepayment - avgSpend;
+
+  // Most recent month with data
   const now = new Date();
   const thisKey = `${now.getFullYear()}-${String(now.getMonth()+1).padStart(2,'0')}`;
-  const latestKey = allMonths.sort().reverse()[0] || thisKey;
-  const useKey = allMonthMap[thisKey] ? thisKey : latestKey;
+  const useKey = allMonthMap[thisKey] ? thisKey : allMonths[allMonths.length - 1] || thisKey;
   const thisMonthData = allMonthMap[useKey] || { income: 0, spend: 0 };
   const thisIncome = thisMonthData.income;
   const thisSpend  = thisMonthData.spend;
-  const thisLeft   = thisIncome - m.repayment - thisSpend;
+  const thisLeft   = thisIncome - mortgageRepayment - thisSpend;
 
   const monthLabel = useKey ? new Date(useKey + '-01').toLocaleString('default', { month: 'long', year: 'numeric' }) : 'This month';
 
@@ -3721,17 +3820,18 @@ function renderFinancialHealth(m) {
           <span style="font-size:14px; font-weight:500; color:#c8f565;">+${fmt(income)}</span>
         </div>
         <div style="display:flex; justify-content:space-between; padding:6px 0; border-bottom:0.5px solid var(--border);">
-          <span style="font-size:14px; color:var(--text2);">Mortgage</span>
+          <span style="font-size:14px; color:var(--text2);">Mortgage repayment</span>
           <span style="font-size:14px; font-weight:500; color:#ff6b6b;">-${fmt(repayment)}</span>
         </div>
         <div style="display:flex; justify-content:space-between; padding:6px 0; border-bottom:0.5px solid var(--border);">
-          <span style="font-size:14px; color:var(--text2);">Spending</span>
-          <span style="font-size:14px; font-weight:500; color:var(--text);">-${fmt(spend)}</span>
+          <span style="font-size:14px; color:var(--text2);">Living expenses</span>
+          <span style="font-size:14px; font-weight:500; color:var(--text);">-${fmt(Math.max(0, spend))}</span>
         </div>
         <div style="display:flex; justify-content:space-between; align-items:center; padding:8px 0; margin-top:2px;">
           <span style="font-size:15px; font-weight:700; color:var(--text);">Left over ${icon}</span>
           <span style="font-size:18px; font-weight:700; color:${colour};">${leftover >= 0 ? '+' : '-'}${fmt(Math.abs(leftover))}</span>
         </div>
+        <div style="font-size:11px; color:var(--text3); margin-top:6px;">Rent excluded · Transfers excluded</div>
       </div>`;
   }
 
