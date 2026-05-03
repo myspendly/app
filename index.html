@@ -960,13 +960,28 @@
       <span id="arrowDanger" style="color:var(--text3); font-size:18px; transition:transform 0.2s;">›</span>
     </div>
     <div id="sectionDanger" style="display:none; margin-top:4px;">
-      <div class="settings-row" onclick="clearData()">
+      <div class="settings-row" onclick="showClearConfirm()">
         <div class="settings-icon">🗑️</div>
         <div class="settings-info">
           <div class="settings-title">Clear all data</div>
           <div class="settings-sub">Remove all transactions and learned categories</div>
         </div>
         <div class="settings-arrow">›</div>
+      </div>
+      <div id="clearConfirm" style="display:none; margin-top:8px; background:rgba(255,107,107,0.1); border-radius:var(--r); padding:14px; text-align:center;">
+        <div style="font-size:13px; color:var(--text2); margin-bottom:12px;">This will delete ALL transactions and cannot be undone. Are you sure?</div>
+        <div style="display:flex; gap:8px;">
+          <button onclick="hideClearConfirm()" style="
+            flex:1; padding:12px; border-radius:var(--r);
+            border:0.5px solid var(--border2); background:var(--bg3);
+            color:var(--text2); font-family:var(--font); font-size:14px; cursor:pointer; touch-action:manipulation;
+          ">Cancel</button>
+          <button onclick="clearData()" style="
+            flex:1; padding:12px; border-radius:var(--r);
+            border:none; background:#ff6b6b;
+            color:#fff; font-family:var(--font); font-size:14px; font-weight:600; cursor:pointer; touch-action:manipulation;
+          ">Clear all</button>
+        </div>
       </div>
     </div>
   </div>
@@ -1824,6 +1839,7 @@ document.addEventListener('click', resetTimeoutTimer);
 const DB = {
   save() { 
     try {
+      if (this.transactions.length === 0) return; // Never save empty data
       const data = JSON.stringify({ 
         transactions: this.transactions, 
         learned: this.learned, 
@@ -1831,26 +1847,52 @@ const DB = {
         customCats: this.customCats, 
         deletedCats: this.deletedCats 
       });
+      // Write to main slot
       localStorage.setItem('spendly_v1', data);
-      // Always keep a rolling backup — separate key so it can never be overwritten by a bad save
-      if (this.transactions.length > 0) {
+      // Verify the write succeeded by reading it back
+      const verify = localStorage.getItem('spendly_v1');
+      if (verify && JSON.parse(verify).transactions.length === this.transactions.length) {
+        // Only update backup after verified successful save
         localStorage.setItem('spendly_backup', data);
         localStorage.setItem('spendly_backup_time', new Date().toISOString());
       }
-    } catch(e) { console.error('Save failed', e); }
+    } catch(e) { 
+      console.error('Save failed', e);
+      showToast('⚠️ Save failed — storage may be full');
+    }
   },
   load() {
     try {
       const raw = localStorage.getItem('spendly_v1');
-      if (!raw) return;
-      const d = JSON.parse(raw);
-      this.transactions = Array.isArray(d.transactions) ? d.transactions : [];
-      this.learned = d.learned && typeof d.learned === 'object' ? d.learned : {};
-      this.uploads = Array.isArray(d.uploads) ? d.uploads : [];
-      this.customCats = d.customCats && typeof d.customCats === 'object' ? d.customCats : {};
-      this.deletedCats = Array.isArray(d.deletedCats) ? d.deletedCats : [];
-      // If main data is empty but backup has data, auto-restore from backup
-      if (this.transactions.length === 0) {
+      if (raw) {
+        const d = JSON.parse(raw);
+        if (Array.isArray(d.transactions) && d.transactions.length > 0) {
+          this.transactions = d.transactions;
+          this.learned = d.learned && typeof d.learned === 'object' ? d.learned : {};
+          this.uploads = Array.isArray(d.uploads) ? d.uploads : [];
+          this.customCats = d.customCats && typeof d.customCats === 'object' ? d.customCats : {};
+          this.deletedCats = Array.isArray(d.deletedCats) ? d.deletedCats : [];
+          return;
+        }
+      }
+      // Main data empty or missing — try backup
+      const backup = localStorage.getItem('spendly_backup');
+      if (backup) {
+        const b = JSON.parse(backup);
+        if (Array.isArray(b.transactions) && b.transactions.length > 0) {
+          this.transactions = b.transactions;
+          this.learned = b.learned || {};
+          this.uploads = b.uploads || [];
+          this.customCats = b.customCats || {};
+          this.deletedCats = b.deletedCats || [];
+          localStorage.setItem('spendly_v1', backup);
+          console.log('Auto-restored from backup:', this.transactions.length, 'transactions');
+          return;
+        }
+      }
+    } catch(e) { 
+      // Main data corrupt — try backup
+      try {
         const backup = localStorage.getItem('spendly_backup');
         if (backup) {
           const b = JSON.parse(backup);
@@ -1860,14 +1902,11 @@ const DB = {
             this.uploads = b.uploads || [];
             this.customCats = b.customCats || {};
             this.deletedCats = b.deletedCats || [];
-            // Restore main data from backup
             localStorage.setItem('spendly_v1', backup);
-            console.log('Auto-restored from backup:', this.transactions.length, 'transactions');
+            console.log('Recovered from backup after error');
           }
         }
-      }
-    } catch(e) { 
-      console.error('Load failed', e);
+      } catch(e2) { console.error('Both main and backup failed to load', e2); }
     }
   },
   transactions: [],
@@ -1913,14 +1952,17 @@ if (Array.isArray(DB.deletedCats)) DB.deletedCats.forEach(n => { delete CATS[n];
 // Safety net — rebuild categories found in transactions but missing from CATS
 // BUT never rebuild a deleted category
 const colors = ['#80cbc4','#ffb74d','#f06292','#aed581','#7986cb','#4db6ac','#ff8a65'];
+let newCatsAdded = false;
 DB.transactions.forEach(t => {
   if (t.category && !CATS[t.category] && !DB.deletedCats.includes(t.category)) {
     const col = colors[Object.keys(CATS).length % colors.length];
     CATS[t.category] = { emoji: '📁', color: col, dim: col + '26' };
     DB.customCats[t.category] = CATS[t.category];
+    newCatsAdded = true;
   }
 });
-DB.save();
+// Only save if we actually added new categories — don't save on every load
+if (newCatsAdded) DB.save();
 
 // CAT_NAMES is now dynamic — always reflects current CATS
 function getCatNames() { return Object.keys(CATS).filter(n => !DB.deletedCats.includes(n)); }
@@ -3313,7 +3355,23 @@ function importFullBackup(event) {
       // Remove deleted categories from CATS
       DB.deletedCats.forEach(n => { delete CATS[n]; });
 
-      DB.save();
+      // Force save — clear old data first to free up space, then save fresh
+      try {
+        localStorage.removeItem('spendly_v1');
+        const data = JSON.stringify({
+          transactions: DB.transactions,
+          learned: DB.learned,
+          uploads: DB.uploads,
+          customCats: DB.customCats,
+          deletedCats: DB.deletedCats
+        });
+        localStorage.setItem('spendly_v1', data);
+        localStorage.setItem('spendly_backup', data);
+        localStorage.setItem('spendly_backup_time', new Date().toISOString());
+      } catch(saveErr) {
+        showToast('⚠️ Storage full — try clearing browser data');
+        return;
+      }
 
       renderDashboard();
       renderTransactions();
@@ -3322,7 +3380,8 @@ function importFullBackup(event) {
       showToast(`✓ Restored ${DB.transactions.length} transactions`);
 
     } catch (err) {
-      showToast('Could not read backup file');
+      console.error('Import error:', err);
+      showToast('Could not read backup file: ' + err.message);
     }
   };
   reader.readAsText(file);
@@ -3670,12 +3729,22 @@ function renderPropertySettings() {
   if (knob) { knob.style.left = enabled ? '21px' : '3px'; knob.style.background = enabled ? '#0a0a0a' : '#888'; }
 }
 
+function showClearConfirm() {
+  document.getElementById('clearConfirm').style.display = 'block';
+}
+
+function hideClearConfirm() {
+  document.getElementById('clearConfirm').style.display = 'none';
+}
+
 function clearData() {
-  if (!confirm('Clear ALL transactions and learned categories? This cannot be undone.')) return;
+  hideClearConfirm();
   DB.transactions = []; DB.learned = {}; DB.uploads = [];
-  DB.save();
+  localStorage.removeItem('spendly_v1');
+  localStorage.removeItem('spendly_backup');
+  localStorage.removeItem('spendly_backup_time');
   renderDashboard(); renderTransactions(); renderInsights(); renderSettings();
-  document.getElementById('uploadHistory').innerHTML = '';
+  try { document.getElementById('uploadHistory').innerHTML = ''; } catch(e) {}
   showToast('✓ All data cleared');
 }
 
