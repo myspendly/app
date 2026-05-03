@@ -727,25 +727,31 @@
     <p>All transaction history</p>
   </div>
 
-  <!-- ALL TIME AVERAGES — never changes -->
+  <!-- ALL TIME AVERAGES -->
   <div class="section-label" style="margin-bottom:10px;">All-time averages</div>
-  <div class="metric-grid" style="margin-bottom:20px;">
+  <div class="metric-grid" style="margin-bottom:8px;">
     <div class="metric-card">
-      <div class="metric-label">Avg monthly income</div>
+      <div class="metric-label">Avg weekly income</div>
       <div class="metric-value" id="a-avg-income">—</div>
     </div>
     <div class="metric-card">
-      <div class="metric-label">Avg monthly spend</div>
+      <div class="metric-label">Avg weekly spend</div>
       <div class="metric-value" id="a-avg-spend">—</div>
     </div>
     <div class="metric-card">
-      <div class="metric-label">Avg savings/month</div>
+      <div class="metric-label">Avg weekly savings</div>
       <div class="metric-value" id="a-avg-savings">—</div>
     </div>
     <div class="metric-card">
-      <div class="metric-label">Avg savings rate</div>
+      <div class="metric-label">Savings rate</div>
       <div class="metric-value" id="a-savings-rate">—</div>
     </div>
+  </div>
+
+  <!-- BEST & WORST MONTHS -->
+  <div class="card" style="margin-bottom:14px;">
+    <div class="section-label">Best & worst months</div>
+    <div id="a-best-worst"></div>
   </div>
 
   <!-- FILTERABLE CHARTS -->
@@ -767,7 +773,7 @@
       <input type="date" id="analyticsDateFrom" onchange="renderAnalyticsCharts()" style="
         width:100%; padding:10px 12px; border-radius:var(--r);
         background:var(--bg2); border:0.5px solid var(--border2);
-        color:var(--text); font-family:var(--font); font-size:14px; outline:none;
+        color:var(--text); font-family:var(--font); font-size:16px; outline:none;
       ">
     </div>
     <div style="flex:1;">
@@ -775,7 +781,7 @@
       <input type="date" id="analyticsDateTo" onchange="renderAnalyticsCharts()" style="
         width:100%; padding:10px 12px; border-radius:var(--r);
         background:var(--bg2); border:0.5px solid var(--border2);
-        color:var(--text); font-family:var(--font); font-size:14px; outline:none;
+        color:var(--text); font-family:var(--font); font-size:16px; outline:none;
       ">
     </div>
   </div>
@@ -804,18 +810,18 @@
     </div>
   </div>
 
+  <!-- Category trends over time -->
+  <div class="card">
+    <div class="section-label">Category trends over time</div>
+    <div id="a-cat-trends"></div>
+  </div>
+
   <!-- Monthly savings trend -->
   <div class="card">
     <div class="section-label" id="savingsTrendLabel">Monthly savings trend · all time</div>
     <div style="position:relative; height:180px;">
       <canvas id="savingsTrendChart"></canvas>
     </div>
-  </div>
-
-  <!-- Top merchants -->
-  <div class="card">
-    <div class="section-label" id="topMerchantsLabel">Top 10 merchants · all time</div>
-    <div id="topMerchants"></div>
   </div>
 
 </div>
@@ -4041,30 +4047,152 @@ function renderAnalytics() {
 }
 
 function renderAnalyticsAverages() {
-  // Always all-time — never changes with period filter
   const allMonthMap = {};
   DB.transactions.forEach(t => {
     const d = new Date(t.date);
     const key = `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}`;
-    if (!allMonthMap[key]) allMonthMap[key] = { income: 0, spend: 0 };
+    if (!allMonthMap[key]) allMonthMap[key] = { income: 0, spend: 0, days: new Set() };
     if (t.category === 'Income') allMonthMap[key].income += t.amount;
     else if (t.category !== 'Transfers') allMonthMap[key].spend += t.isDebit ? t.amount : -t.amount;
+    allMonthMap[key].days.add(t.date);
   });
-  const allMonths = Object.keys(allMonthMap);
+
+  const allMonths = Object.keys(allMonthMap).sort();
   const n = allMonths.length || 1;
+
+  // Calculate total weeks across all months using actual day ranges
+  let totalWeeks = 0;
+  allMonths.forEach(key => {
+    const [y, m] = key.split('-').map(Number);
+    const daysInMonth = new Date(y, m, 0).getDate();
+    totalWeeks += daysInMonth / 7;
+  });
+
   const totalIncome = allMonths.reduce((s, m) => s + allMonthMap[m].income, 0);
   const totalSpend  = allMonths.reduce((s, m) => s + allMonthMap[m].spend, 0);
   const totalSaved  = totalIncome - totalSpend;
   const savingsRate = totalIncome > 0 ? Math.round(totalSaved / totalIncome * 100) : 0;
 
-  document.getElementById('a-avg-income').textContent  = fmt(totalIncome / n);
-  document.getElementById('a-avg-spend').textContent   = fmt(totalSpend / n);
+  // Weekly averages
+  const weeklyIncome  = totalIncome / totalWeeks;
+  const weeklySpend   = totalSpend  / totalWeeks;
+  const weeklySavings = totalSaved  / totalWeeks;
+
+  document.getElementById('a-avg-income').textContent = fmt(weeklyIncome);
+  document.getElementById('a-avg-spend').textContent  = fmt(weeklySpend);
   const avgSavEl = document.getElementById('a-avg-savings');
-  avgSavEl.textContent  = fmt(Math.abs(totalSaved / n));
-  avgSavEl.style.color  = totalSaved >= 0 ? '#c8f565' : '#ff6b6b';
+  avgSavEl.textContent = fmt(Math.abs(weeklySavings));
+  avgSavEl.style.color = weeklySavings >= 0 ? '#c8f565' : '#ff6b6b';
   const rateEl = document.getElementById('a-savings-rate');
   rateEl.textContent = `${savingsRate}%`;
-  rateEl.style.color = savingsRate >= 0 ? '#c8f565' : '#ff6b6b';
+  rateEl.style.color = savingsRate >= 20 ? '#c8f565' : savingsRate >= 0 ? '#ffb74d' : '#ff6b6b';
+
+  // Best & worst months
+  const monthStats = allMonths.map(key => {
+    const { income, spend } = allMonthMap[key];
+    const saved = income - spend;
+    const [y, m] = key.split('-');
+    const label = new Date(y, m - 1).toLocaleString('default', { month: 'short', year: '2-digit' });
+    return { key, label, income, spend, saved };
+  });
+
+  const bestSpend  = [...monthStats].sort((a,b) => a.spend - b.spend)[0];
+  const worstSpend = [...monthStats].sort((a,b) => b.spend - a.spend)[0];
+  const bestSave   = [...monthStats].sort((a,b) => b.saved - a.saved)[0];
+
+  const bwEl = document.getElementById('a-best-worst');
+  if (bwEl && monthStats.length >= 2) {
+    bwEl.innerHTML = `
+      <div style="display:flex; flex-direction:column; gap:8px;">
+        <div style="display:flex; justify-content:space-between; align-items:center; padding:10px 0; border-bottom:0.5px solid var(--border);">
+          <div>
+            <div style="font-size:11px; color:var(--text3); text-transform:uppercase; letter-spacing:0.05em; margin-bottom:2px;">Lowest spend month</div>
+            <div style="font-size:14px; font-weight:500; color:var(--text);">${bestSpend.label}</div>
+          </div>
+          <div style="font-size:16px; font-weight:600; color:#c8f565;">${fmt(bestSpend.spend)}</div>
+        </div>
+        <div style="display:flex; justify-content:space-between; align-items:center; padding:10px 0; border-bottom:0.5px solid var(--border);">
+          <div>
+            <div style="font-size:11px; color:var(--text3); text-transform:uppercase; letter-spacing:0.05em; margin-bottom:2px;">Highest spend month</div>
+            <div style="font-size:14px; font-weight:500; color:var(--text);">${worstSpend.label}</div>
+          </div>
+          <div style="font-size:16px; font-weight:600; color:#ff6b6b;">${fmt(worstSpend.spend)}</div>
+        </div>
+        <div style="display:flex; justify-content:space-between; align-items:center; padding:10px 0;">
+          <div>
+            <div style="font-size:11px; color:var(--text3); text-transform:uppercase; letter-spacing:0.05em; margin-bottom:2px;">Best savings month</div>
+            <div style="font-size:14px; font-weight:500; color:var(--text);">${bestSave.label}</div>
+          </div>
+          <div style="font-size:16px; font-weight:600; color:#64b5f6;">${fmt(bestSave.saved)}</div>
+        </div>
+      </div>`;
+  } else if (bwEl) {
+    bwEl.innerHTML = '<div style="font-size:13px; color:var(--text3); padding:8px 0;">Need at least 2 months of data</div>';
+  }
+
+  // Category trends
+  renderCategoryTrends(allMonthMap, allMonths);
+}
+
+function renderCategoryTrends(allMonthMap, allMonths) {
+  const el = document.getElementById('a-cat-trends');
+  if (!el || allMonths.length < 2) {
+    if (el) el.innerHTML = '<div style="font-size:13px; color:var(--text3); padding:8px 0;">Need at least 2 months of data</div>';
+    return;
+  }
+
+  // Build per-category per-month totals
+  const catMonthMap = {};
+  DB.transactions.forEach(t => {
+    if (t.category === 'Income' || t.category === 'Transfers') return;
+    const d = new Date(t.date);
+    const key = `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}`;
+    if (!allMonths.includes(key)) return;
+    if (!catMonthMap[t.category]) catMonthMap[t.category] = {};
+    if (!catMonthMap[t.category][key]) catMonthMap[t.category][key] = 0;
+    catMonthMap[t.category][key] += t.isDebit ? t.amount : -t.amount;
+  });
+
+  // Sort cats by total spend descending
+  const catsSorted = Object.entries(catMonthMap)
+    .map(([cat, months]) => ({ cat, total: Object.values(months).reduce((s,v) => s+v, 0) }))
+    .sort((a,b) => b.total - a.total)
+    .slice(0, 6) // top 6 categories
+    .map(x => x.cat);
+
+  const recentMonths = allMonths.slice(-4); // last 4 months for trend
+  const monthLabels = recentMonths.map(key => {
+    const [y, m] = key.split('-');
+    return new Date(y, m - 1).toLocaleString('default', { month: 'short' });
+  });
+
+  el.innerHTML = catsSorted.map(cat => {
+    const c = CATS[cat] || CATS['Other'];
+    const vals = recentMonths.map(m => catMonthMap[cat]?.[m] || 0);
+    const maxVal = Math.max(...vals, 1);
+    const trend = vals.length >= 2 ? vals[vals.length-1] - vals[vals.length-2] : 0;
+    const trendStr = trend > 0 ? `▲ ${fmt(trend)}` : trend < 0 ? `▼ ${fmt(Math.abs(trend))}` : '—';
+    const trendColor = trend > 0 ? '#ff6b6b' : trend < 0 ? '#c8f565' : 'var(--text3)';
+
+    return `<div style="padding:12px 0; border-bottom:0.5px solid var(--border);">
+      <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:8px;">
+        <div style="display:flex; align-items:center; gap:8px;">
+          <span style="font-size:16px;">${c.emoji}</span>
+          <span style="font-size:13px; font-weight:500; color:var(--text);">${cat}</span>
+        </div>
+        <span style="font-size:12px; font-weight:500; color:${trendColor};">${trendStr} vs last month</span>
+      </div>
+      <div style="display:flex; align-items:flex-end; gap:6px; height:40px;">
+        ${vals.map((v, i) => `
+          <div style="flex:1; display:flex; flex-direction:column; align-items:center; gap:3px;">
+            <div style="width:100%; background:${c.color}33; border-radius:3px; overflow:hidden; height:${Math.max(4, Math.round(v/maxVal*32))}px; margin-top:auto;">
+              <div style="width:100%; height:100%; background:${c.color}; opacity:0.8;"></div>
+            </div>
+            <span style="font-size:9px; color:var(--text3);">${monthLabels[i]}</span>
+          </div>`).join('')}
+      </div>
+    </div>`;
+  }).join('');
 }
 
 function renderAnalyticsCharts() {
@@ -4074,7 +4202,6 @@ function renderAnalyticsCharts() {
   document.getElementById('incomeVsSpendLabel').textContent = `Income vs spending · ${label}`;
   document.getElementById('pieSectionLabel').textContent    = `Spending by category · ${label}`;
   document.getElementById('savingsTrendLabel').textContent  = `Monthly savings trend · ${label}`;
-  document.getElementById('topMerchantsLabel').textContent  = `Top 10 merchants · ${label}`;
 
   const txns = getAnalyticsTxns();
 
@@ -4178,24 +4305,6 @@ function renderAnalyticsCharts() {
     }
   });
 
-  // ── Top merchants ──
-  const merchantTotals = {};
-  txns.filter(t => t.category !== 'Transfers').forEach(t => {
-    merchantTotals[t.merchant] = (merchantTotals[t.merchant] || 0) + (t.isDebit ? t.amount : -t.amount);
-  });
-  const topMerchants = Object.entries(merchantTotals).filter(([,v]) => v > 0).sort((a,b) => b[1]-a[1]).slice(0, 10);
-  const maxMerchant = topMerchants[0]?.[1] || 1;
-  document.getElementById('topMerchants').innerHTML = topMerchants.map(([name, amt], i) => `
-    <div style="display:flex; align-items:center; gap:10px; padding:9px 0; border-bottom:0.5px solid var(--border);">
-      <div style="font-size:12px; color:var(--text3); width:16px; text-align:right; flex-shrink:0;">${i+1}</div>
-      <div style="flex:1; min-width:0;">
-        <div style="font-size:13px; font-weight:500; color:var(--text); white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">${name}</div>
-        <div style="height:3px; background:var(--bg4); border-radius:2px; margin-top:5px; overflow:hidden;">
-          <div style="height:100%; width:${Math.round(amt/maxMerchant*100)}%; background:var(--accent); border-radius:2px;"></div>
-        </div>
-      </div>
-      <div style="font-family:var(--mono); font-size:13px; font-weight:500; color:var(--text); flex-shrink:0;">${fmt(amt)}</div>
-    </div>`).join('');
 }
 
 // ─── INIT ──────────────────────────────────────────────────────────────────────
