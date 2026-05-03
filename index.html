@@ -4157,22 +4157,37 @@ function renderCategoryTrends(allMonthMap, allMonths) {
   const catsSorted = Object.entries(catMonthMap)
     .map(([cat, months]) => ({ cat, total: Object.values(months).reduce((s,v) => s+v, 0) }))
     .sort((a,b) => b.total - a.total)
-    .slice(0, 6) // top 6 categories
+    .slice(0, 10) // top 10 categories
     .map(x => x.cat);
 
-  const recentMonths = allMonths.slice(-4); // last 4 months for trend
+  const recentMonths = allMonths.slice(-3); // last 3 months for trend
   const monthLabels = recentMonths.map(key => {
     const [y, m] = key.split('-');
     return new Date(y, m - 1).toLocaleString('default', { month: 'short' });
   });
 
-  el.innerHTML = catsSorted.map(cat => {
-    const c = CATS[cat] || CATS['Other'];
+  // Natural distinct colour palette for trend bars
+  const trendColors = [
+    '#7EB8A4', // sage green
+    '#C4956A', // warm terracotta
+    '#7B9BB5', // slate blue
+    '#C4A882', // warm sand
+    '#9B7EB8', // muted lavender
+    '#7EB87E', // moss green
+    '#B87E7E', // dusty rose
+    '#7EAAB8', // steel blue
+    '#B8A87E', // warm khaki
+    '#A87EB8', // soft plum
+  ];
+
+  el.innerHTML = catsSorted.map((cat, catIdx) => {
+    const trendColor = trendColors[catIdx % trendColors.length];
     const vals = recentMonths.map(m => catMonthMap[cat]?.[m] || 0);
     const maxVal = Math.max(...vals, 1);
     const trend = vals.length >= 2 ? vals[vals.length-1] - vals[vals.length-2] : 0;
     const trendStr = trend > 0 ? `▲ ${fmt(trend)}` : trend < 0 ? `▼ ${fmt(Math.abs(trend))}` : '—';
-    const trendColor = trend > 0 ? '#ff6b6b' : trend < 0 ? '#c8f565' : 'var(--text3)';
+    const trendIndicatorColor = trend > 0 ? '#ff6b6b' : trend < 0 ? '#c8f565' : 'var(--text3)';
+    const c = CATS[cat] || CATS['Other'];
 
     return `<div style="padding:12px 0; border-bottom:0.5px solid var(--border);">
       <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:8px;">
@@ -4180,13 +4195,14 @@ function renderCategoryTrends(allMonthMap, allMonths) {
           <span style="font-size:16px;">${c.emoji}</span>
           <span style="font-size:13px; font-weight:500; color:var(--text);">${cat}</span>
         </div>
-        <span style="font-size:12px; font-weight:500; color:${trendColor};">${trendStr} vs last month</span>
+        <span style="font-size:12px; font-weight:500; color:${trendIndicatorColor};">${trendStr} vs last month</span>
       </div>
-      <div style="display:flex; align-items:flex-end; gap:6px; height:40px;">
+      <div style="display:flex; align-items:flex-end; gap:6px; height:44px;">
         ${vals.map((v, i) => `
           <div style="flex:1; display:flex; flex-direction:column; align-items:center; gap:3px;">
-            <div style="width:100%; background:${c.color}33; border-radius:3px; overflow:hidden; height:${Math.max(4, Math.round(v/maxVal*32))}px; margin-top:auto;">
-              <div style="width:100%; height:100%; background:${c.color}; opacity:0.8;"></div>
+            <div style="font-size:9px; color:var(--text3);">${v > 0 ? '$' + Math.round(v) : ''}</div>
+            <div style="width:100%; background:${trendColor}22; border-radius:3px; overflow:hidden; height:${Math.max(4, Math.round(v/maxVal*28))}px; margin-top:auto;">
+              <div style="width:100%; height:100%; background:${trendColor};"></div>
             </div>
             <span style="font-size:9px; color:var(--text3);">${monthLabels[i]}</span>
           </div>`).join('')}
