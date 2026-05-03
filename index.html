@@ -1048,31 +1048,19 @@
       background:var(--bg3); border-radius:var(--r); padding:14px; margin-bottom:20px;
       font-size:14px; color:var(--text2); line-height:1.6;
     "></div>
-    <div class="field-label">What to do with transactions in this category?</div>
-    <button onclick="deleteCatAction('move')" style="
+    <div style="font-size:13px; color:var(--text2); margin-bottom:16px;">All transactions in this category will be moved to <strong style="color:var(--text);">Other</strong>. Your data will never be deleted.</div>
+    <button onclick="deleteCatAction()" style="
+      width:100%; padding:14px; border-radius:var(--r); margin-bottom:10px;
+      border:none; background:#ff6b6b;
+      color:#fff; font-family:var(--font); font-size:14px;
+      font-weight:600; cursor:pointer;
+    ">Delete category</button>
+    <button onclick="closeDeleteCatSheet()" style="
       width:100%; padding:14px; border-radius:var(--r); margin-bottom:10px;
       border:0.5px solid var(--border2); background:var(--bg3);
-      color:var(--text); font-family:var(--font); font-size:14px;
-      font-weight:500; cursor:pointer; text-align:left; display:flex; align-items:center; gap:12px;
-    ">
-      <span style="font-size:20px;">📦</span>
-      <div>
-        <div style="font-weight:600;">Move to Other</div>
-        <div style="font-size:12px; color:var(--text2); margin-top:2px;">Keep all transactions, just recategorise them</div>
-      </div>
-    </button>
-    <button onclick="deleteCatAction('delete')" style="
-      width:100%; padding:14px; border-radius:var(--r); margin-bottom:20px;
-      border:0.5px solid rgba(255,107,107,0.3); background:rgba(255,107,107,0.08);
-      color:#ff6b6b; font-family:var(--font); font-size:14px;
-      font-weight:500; cursor:pointer; text-align:left; display:flex; align-items:center; gap:12px;
-    ">
-      <span style="font-size:20px;">🗑️</span>
-      <div>
-        <div style="font-weight:600;">Delete all transactions</div>
-        <div style="font-size:12px; color:rgba(255,107,107,0.7); margin-top:2px;">Permanently removes all transactions in this category</div>
-      </div>
-    </button>
+      color:var(--text2); font-family:var(--font); font-size:14px;
+      font-weight:500; cursor:pointer;
+    ">Cancel</button>
   </div>
 </div>
 
@@ -1809,16 +1797,31 @@ document.addEventListener('touchstart', resetTimeoutTimer, { passive: true });
 document.addEventListener('click', resetTimeoutTimer);
 
 const DB = {
-  save() { localStorage.setItem('spendly_v1', JSON.stringify({ transactions: this.transactions, learned: this.learned, uploads: this.uploads, customCats: this.customCats, deletedCats: this.deletedCats })); },
+  save() { 
+    try {
+      localStorage.setItem('spendly_v1', JSON.stringify({ 
+        transactions: this.transactions, 
+        learned: this.learned, 
+        uploads: this.uploads, 
+        customCats: this.customCats, 
+        deletedCats: this.deletedCats 
+      })); 
+    } catch(e) { console.error('Save failed', e); }
+  },
   load() {
     try {
-      const d = JSON.parse(localStorage.getItem('spendly_v1') || '{}');
-      this.transactions = d.transactions || [];
-      this.learned = d.learned || {};
-      this.uploads = d.uploads || [];
-      this.customCats = d.customCats || {};
-      this.deletedCats = d.deletedCats || [];
-    } catch(e) { this.transactions = []; this.learned = {}; this.uploads = []; this.customCats = {}; this.deletedCats = []; }
+      const raw = localStorage.getItem('spendly_v1');
+      if (!raw) return;
+      const d = JSON.parse(raw);
+      this.transactions = Array.isArray(d.transactions) ? d.transactions : [];
+      this.learned = d.learned && typeof d.learned === 'object' ? d.learned : {};
+      this.uploads = Array.isArray(d.uploads) ? d.uploads : [];
+      this.customCats = d.customCats && typeof d.customCats === 'object' ? d.customCats : {};
+      this.deletedCats = Array.isArray(d.deletedCats) ? d.deletedCats : [];
+    } catch(e) { 
+      console.error('Load failed', e);
+      // Don't wipe data on error — keep whatever was loaded
+    }
   },
   transactions: [],
   learned: {},
@@ -1828,7 +1831,7 @@ const DB = {
 };
 DB.load();
 // Remove any previously deleted default categories from CATS
-DB.deletedCats.forEach(n => { delete CATS[n]; });
+if (Array.isArray(DB.deletedCats)) DB.deletedCats.forEach(n => { delete CATS[n]; });
 
 // ─── CATEGORIES ────────────────────────────────────────────────────────────────
 const CATS = {
@@ -3100,14 +3103,9 @@ function deleteCatAction(action) {
   const name = deleteCatTarget;
   if (!name) return;
 
-  if (action === 'move') {
-    // Move all transactions to Other
-    DB.transactions.forEach(t => { if (t.category === name) t.category = 'Other'; });
-    Object.keys(DB.learned).forEach(k => { if (DB.learned[k] === name) DB.learned[k] = 'Other'; });
-  } else {
-    // Delete all transactions in this category
-    DB.transactions = DB.transactions.filter(t => t.category !== name);
-  }
+  // Always move transactions to Other — never delete transaction data
+  DB.transactions.forEach(t => { if (t.category === name) t.category = 'Other'; });
+  Object.keys(DB.learned).forEach(k => { if (DB.learned[k] === name) DB.learned[k] = 'Other'; });
 
   // Remove the category
   delete CATS[name];
