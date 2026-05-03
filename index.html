@@ -4141,24 +4141,28 @@ function renderCategoryTrends(allMonthMap, allMonths) {
     return;
   }
 
-  // Build per-category per-month totals
+  // Build per-category totals across ALL time for ranking
+  const catAllTime = {};
   const catMonthMap = {};
   DB.transactions.forEach(t => {
     if (t.category === 'Income' || t.category === 'Transfers') return;
     const d = new Date(t.date);
     const key = `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}`;
-    if (!allMonths.includes(key)) return;
+    // All time totals for ranking
+    if (!catAllTime[t.category]) catAllTime[t.category] = 0;
+    catAllTime[t.category] += t.isDebit ? t.amount : -t.amount;
+    // Monthly breakdown for chart
     if (!catMonthMap[t.category]) catMonthMap[t.category] = {};
     if (!catMonthMap[t.category][key]) catMonthMap[t.category][key] = 0;
     catMonthMap[t.category][key] += t.isDebit ? t.amount : -t.amount;
   });
 
-  // Sort cats by total spend descending
-  const catsSorted = Object.entries(catMonthMap)
-    .map(([cat, months]) => ({ cat, total: Object.values(months).reduce((s,v) => s+v, 0) }))
-    .sort((a,b) => b.total - a.total)
-    .slice(0, 10) // top 10 categories
-    .map(x => x.cat);
+  // Top 10 by all-time spend
+  const catsSorted = Object.entries(catAllTime)
+    .filter(([, v]) => v > 0)
+    .sort((a, b) => b[1] - a[1])
+    .slice(0, 10)
+    .map(([cat]) => cat);
 
   const recentMonths = allMonths.slice(-3); // last 3 months for trend
   const monthLabels = recentMonths.map(key => {
