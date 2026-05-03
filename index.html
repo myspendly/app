@@ -338,11 +338,14 @@
     background: #1e1e1e; border: 0.5px solid #333;
     color: #f0f0f0; font-family: 'DM Sans', sans-serif;
     font-size: 22px; font-weight: 500; cursor: pointer;
-    transition: background 0.1s, transform 0.1s;
+    transition: background 0.05s, transform 0.05s;
     display: flex; align-items: center; justify-content: center;
     touch-action: manipulation;
+    -webkit-tap-highlight-color: transparent;
+    user-select: none;
+    -webkit-user-select: none;
   }
-  .pin-btn:active { background: #333; transform: scale(0.94); }
+  .pin-btn:active { background: #444; transform: scale(0.92); }
   .pin-del { font-size: 18px; }
 
 
@@ -385,18 +388,18 @@
 
   <!-- Number pad -->
   <div style="display:grid; grid-template-columns:repeat(3,1fr); gap:12px; width:240px;">
-    <button class="pin-btn" onclick="pinPress('1')">1</button>
-    <button class="pin-btn" onclick="pinPress('2')">2</button>
-    <button class="pin-btn" onclick="pinPress('3')">3</button>
-    <button class="pin-btn" onclick="pinPress('4')">4</button>
-    <button class="pin-btn" onclick="pinPress('5')">5</button>
-    <button class="pin-btn" onclick="pinPress('6')">6</button>
-    <button class="pin-btn" onclick="pinPress('7')">7</button>
-    <button class="pin-btn" onclick="pinPress('8')">8</button>
-    <button class="pin-btn" onclick="pinPress('9')">9</button>
+    <button class="pin-btn" ontouchstart="event.preventDefault();pinPress('1')" onclick="pinPress('1')">1</button>
+    <button class="pin-btn" ontouchstart="event.preventDefault();pinPress('2')" onclick="pinPress('2')">2</button>
+    <button class="pin-btn" ontouchstart="event.preventDefault();pinPress('3')" onclick="pinPress('3')">3</button>
+    <button class="pin-btn" ontouchstart="event.preventDefault();pinPress('4')" onclick="pinPress('4')">4</button>
+    <button class="pin-btn" ontouchstart="event.preventDefault();pinPress('5')" onclick="pinPress('5')">5</button>
+    <button class="pin-btn" ontouchstart="event.preventDefault();pinPress('6')" onclick="pinPress('6')">6</button>
+    <button class="pin-btn" ontouchstart="event.preventDefault();pinPress('7')" onclick="pinPress('7')">7</button>
+    <button class="pin-btn" ontouchstart="event.preventDefault();pinPress('8')" onclick="pinPress('8')">8</button>
+    <button class="pin-btn" ontouchstart="event.preventDefault();pinPress('9')" onclick="pinPress('9')">9</button>
     <div></div>
-    <button class="pin-btn" onclick="pinPress('0')">0</button>
-    <button class="pin-btn pin-del" onclick="pinDelete()">⌫</button>
+    <button class="pin-btn" ontouchstart="event.preventDefault();pinPress('0')" onclick="pinPress('0')">0</button>
+    <button class="pin-btn pin-del" ontouchstart="event.preventDefault();pinDelete()" onclick="pinDelete()">⌫</button>
   </div>
 
   <div id="pinError" style="font-size:13px; color:#ff6b6b; margin-top:20px; min-height:20px; text-align:center;"></div>
@@ -462,18 +465,18 @@
   </div>
 
   <div style="display:grid; grid-template-columns:repeat(3,1fr); gap:12px; width:240px;">
-    <button class="pin-btn" onclick="setPinPress('1')">1</button>
-    <button class="pin-btn" onclick="setPinPress('2')">2</button>
-    <button class="pin-btn" onclick="setPinPress('3')">3</button>
-    <button class="pin-btn" onclick="setPinPress('4')">4</button>
-    <button class="pin-btn" onclick="setPinPress('5')">5</button>
-    <button class="pin-btn" onclick="setPinPress('6')">6</button>
-    <button class="pin-btn" onclick="setPinPress('7')">7</button>
-    <button class="pin-btn" onclick="setPinPress('8')">8</button>
-    <button class="pin-btn" onclick="setPinPress('9')">9</button>
+    <button class="pin-btn" ontouchstart="event.preventDefault();setPinPress('1')" onclick="setPinPress('1')">1</button>
+    <button class="pin-btn" ontouchstart="event.preventDefault();setPinPress('2')" onclick="setPinPress('2')">2</button>
+    <button class="pin-btn" ontouchstart="event.preventDefault();setPinPress('3')" onclick="setPinPress('3')">3</button>
+    <button class="pin-btn" ontouchstart="event.preventDefault();setPinPress('4')" onclick="setPinPress('4')">4</button>
+    <button class="pin-btn" ontouchstart="event.preventDefault();setPinPress('5')" onclick="setPinPress('5')">5</button>
+    <button class="pin-btn" ontouchstart="event.preventDefault();setPinPress('6')" onclick="setPinPress('6')">6</button>
+    <button class="pin-btn" ontouchstart="event.preventDefault();setPinPress('7')" onclick="setPinPress('7')">7</button>
+    <button class="pin-btn" ontouchstart="event.preventDefault();setPinPress('8')" onclick="setPinPress('8')">8</button>
+    <button class="pin-btn" ontouchstart="event.preventDefault();setPinPress('9')" onclick="setPinPress('9')">9</button>
     <div></div>
-    <button class="pin-btn" onclick="setPinPress('0')">0</button>
-    <button class="pin-btn pin-del" onclick="setPinDelete()">⌫</button>
+    <button class="pin-btn" ontouchstart="event.preventDefault();setPinPress('0')" onclick="setPinPress('0')">0</button>
+    <button class="pin-btn pin-del" ontouchstart="event.preventDefault();setPinDelete()" onclick="setPinDelete()">⌫</button>
   </div>
 
   <button onclick="skipPin()" style="
@@ -3269,6 +3272,8 @@ function exportFullBackup() {
     transactions: DB.transactions,
     learned: DB.learned,
     uploads: DB.uploads,
+    customCats: DB.customCats,
+    deletedCats: DB.deletedCats,
   };
   const blob = new Blob([JSON.stringify(backup, null, 2)], { type: 'application/json' });
   const url = URL.createObjectURL(blob);
@@ -3290,16 +3295,23 @@ function importFullBackup(event) {
     try {
       const backup = JSON.parse(e.target.result);
 
-      if (!backup.version || !backup.transactions) {
-        showToast('Invalid backup file');
+      // Accept any file that has transactions array
+      if (!backup.transactions || !Array.isArray(backup.transactions)) {
+        showToast('Invalid backup file — no transactions found');
         return;
       }
-
-      if (!confirm(`This will restore ${backup.transactions.length} transactions from ${new Date(backup.exportedAt).toLocaleDateString('en-AU')}.\n\nYour current data will be replaced. Continue?`)) return;
 
       DB.transactions = backup.transactions || [];
       DB.learned = backup.learned || {};
       DB.uploads = backup.uploads || [];
+      DB.customCats = backup.customCats || {};
+      DB.deletedCats = backup.deletedCats || [];
+
+      // Restore custom categories into CATS
+      Object.entries(DB.customCats).forEach(([name, cat]) => { CATS[name] = cat; });
+      // Remove deleted categories from CATS
+      DB.deletedCats.forEach(n => { delete CATS[n]; });
+
       DB.save();
 
       renderDashboard();
