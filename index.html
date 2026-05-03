@@ -918,7 +918,7 @@
       <div class="settings-row" onclick="exportFullBackup()">
         <div class="settings-icon">💾</div>
         <div class="settings-info">
-          <div class="settings-title">Export backup CSV</div>
+          <div class="settings-title">Export backup file</div>
           <div class="settings-sub">Saves everything — transactions, categories & settings</div>
         </div>
         <div class="settings-arrow">›</div>
@@ -926,7 +926,7 @@
       <div class="settings-row" onclick="document.getElementById('backupFileInput').click()">
         <div class="settings-icon">📲</div>
         <div class="settings-info">
-          <div class="settings-title">Import backup CSV</div>
+          <div class="settings-title">Import backup file</div>
           <div class="settings-sub">Restore from a previously exported backup file</div>
         </div>
         <div class="settings-arrow">›</div>
@@ -943,10 +943,10 @@
       <div style="background:var(--bg3); border-radius:var(--r); padding:14px; margin-top:8px;">
         <div style="font-size:12px; font-weight:600; color:var(--text); margin-bottom:10px;">📱 How to transfer to a new phone</div>
         <div style="font-size:12px; color:var(--text2); line-height:1.9;">
-          <div style="margin-bottom:4px;"><span style="color:var(--accent); font-weight:600;">Step 1</span> &nbsp;On your old phone, tap <strong style="color:var(--text);">Export backup CSV</strong> above</div>
+          <div style="margin-bottom:4px;"><span style="color:var(--accent); font-weight:600;">Step 1</span> &nbsp;On your old phone, tap <strong style="color:var(--text);">Export backup file</strong> above</div>
           <div style="margin-bottom:4px;"><span style="color:var(--accent); font-weight:600;">Step 2</span> &nbsp;Save the file to iCloud Drive or email it to yourself</div>
           <div style="margin-bottom:4px;"><span style="color:var(--accent); font-weight:600;">Step 3</span> &nbsp;On your new phone, open Spendly and go to Settings</div>
-          <div style="margin-bottom:4px;"><span style="color:var(--accent); font-weight:600;">Step 4</span> &nbsp;Tap <strong style="color:var(--text);">Import backup CSV</strong> and select your file</div>
+          <div style="margin-bottom:4px;"><span style="color:var(--accent); font-weight:600;">Step 4</span> &nbsp;Tap <strong style="color:var(--text);">Import backup file</strong> and select your file</div>
           <div><span style="color:var(--accent); font-weight:600;">Step 5</span> &nbsp;All your data, categories and history will be restored ✓</div>
         </div>
       </div>
@@ -2696,7 +2696,7 @@ function renderCatBreakdown(txns) {
           ${budgetHtml}
         </div>
         <div class="cat-amount" style="color:${isIncome ? '#c8f565' : isTransfer ? '#64b5f6' : netAmt <= 0 ? '#c8f565' : 'var(--text)'}">
-          ${isIncome ? '+' : netAmt < 0 ? '+' : ''}${fmt(Math.abs(netAmt))}
+          ${isTransfer ? `${data.count} transfer${data.count !== 1 ? 's' : ''}` : `${isIncome ? '+' : netAmt < 0 ? '+' : ''}${fmt(Math.abs(netAmt))}`}
         </div>
       </div>`;
   }).join('');
@@ -3103,6 +3103,10 @@ function renameCat(oldName, newName) {
   if (!newName || newName === oldName) return;
   if (CATS[newName]) { showToast('That name already exists'); return; }
 
+  // Save the order FIRST before any changes so position is preserved
+  const currentOrder = getOrderedCatNames();
+  const newOrder = currentOrder.map(n => n === oldName ? newName : n);
+
   CATS[newName] = { ...CATS[oldName] };
   delete CATS[oldName];
 
@@ -3111,9 +3115,8 @@ function renameCat(oldName, newName) {
 
   DB.transactions.forEach(t => { if (t.category === oldName) t.category = newName; });
   Object.keys(DB.learned).forEach(k => { if (DB.learned[k] === oldName) DB.learned[k] = newName; });
-  const order = getOrderedCatNames().map(n => n === oldName ? newName : n);
-  saveCatOrder(order);
 
+  saveCatOrder(newOrder);
   DB.save();
   renderCatEditorList();
   renderDashboard();
