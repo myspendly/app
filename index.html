@@ -668,6 +668,8 @@
     </div>
   </div>
 
+  <div id="uploadResult" style="display:none;"></div>
+
   <div class="processing" id="processingDiv">
     <div class="spinner"></div>
     <div class="processing-title" id="processingTitle">Reading your statement…</div>
@@ -2153,8 +2155,6 @@ function parseCSV(text) {
   // Lenient date match — d/mm/yyyy or dd/mm/yyyy
   const isCommBank = /^\d{1,2}\/\d{1,2}\/\d{4}$/.test(cbDate) && /^-?[\d]+\.?\d*$/.test(cbAmt);
 
-  console.log('CommBank detection:', { cbDate, cbAmt, isCommBank, cbFirstLine });
-
   if (isCommBank) {
     const rows = [];
     for (let i = 0; i < allLines.length; i++) {
@@ -2317,6 +2317,8 @@ document.getElementById('fileInput').addEventListener('change', function(e) {
 async function processFile(text, filename) {
   document.getElementById('uploadZone').style.display = 'none';
   document.getElementById('supportedBanks').style.display = 'none';
+  const resultEl = document.getElementById('uploadResult');
+  if (resultEl) resultEl.style.display = 'none';
   const proc = document.getElementById('processingDiv');
   proc.classList.add('show');
 
@@ -2349,8 +2351,7 @@ async function processFile(text, filename) {
     proc.classList.remove('show');
     document.getElementById('uploadZone').style.display = '';
     document.getElementById('supportedBanks').style.display = '';
-    showToast('Could not read file — check console for details');
-    console.error('Parse returned 0 rows. First line of file:', allLines?.[0]);
+    showUploadResult(false, 'Could not read file', 'Format not recognised — make sure you export as CSV from your bank app');
     return;
   }
 
@@ -2367,12 +2368,40 @@ async function processFile(text, filename) {
   document.getElementById('uploadZone').style.display = '';
   document.getElementById('supportedBanks').style.display = '';
 
-  showToast(`✓ ${newOnes.length} transactions imported`);
-  renderUploadHistory();
-  renderDashboard();
-  renderTransactions();
-  renderInsights();
-  showPage('dashboard', document.querySelector('.nav-btn'));
+  if (newOnes.length === 0) {
+    showUploadResult(false, 'No new transactions', `${parsed.length} transactions found but all already exist — try a newer export`);
+  } else {
+    showUploadResult(true, `${newOnes.length} transactions imported`, `${parsed.length - newOnes.length > 0 ? `${parsed.length - newOnes.length} duplicates skipped · ` : ''}All done!`);
+    renderUploadHistory();
+    renderDashboard();
+    renderTransactions();
+    renderInsights();
+    setTimeout(() => showPage('dashboard', document.querySelector('.nav-btn')), 1500);
+  }
+}
+
+function showUploadResult(success, title, subtitle) {
+  const zone = document.getElementById('uploadZone');
+  const resultEl = document.getElementById('uploadResult');
+  if (!resultEl) {
+    // Create result element if it doesn't exist
+    const el = document.createElement('div');
+    el.id = 'uploadResult';
+    zone.parentNode.insertBefore(el, zone.nextSibling);
+  }
+  const el = document.getElementById('uploadResult');
+  const colour = success ? '#c8f565' : '#ff6b6b';
+  const bg = success ? 'rgba(200,245,101,0.1)' : 'rgba(255,107,107,0.1)';
+  const icon = success ? '✅' : '❌';
+  el.style.display = 'block';
+  el.innerHTML = `
+    <div style="background:${bg}; border:0.5px solid ${colour}40; border-radius:14px; padding:20px; text-align:center; margin-bottom:16px;">
+      <div style="font-size:32px; margin-bottom:8px;">${icon}</div>
+      <div style="font-size:17px; font-weight:600; color:${colour}; margin-bottom:4px;">${title}</div>
+      <div style="font-size:13px; color:var(--text2);">${subtitle}</div>
+    </div>`;
+  // Auto hide after 4 seconds on success
+  if (success) setTimeout(() => { el.style.display = 'none'; }, 4000);
 }
 
 function sleep(ms) { return new Promise(r => setTimeout(r, ms)); }
