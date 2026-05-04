@@ -2010,7 +2010,7 @@ function categorise(merchant) {
 
 // ─── CSV PARSER ───────────────────────────────────────────────────────────────
 function parseCSV(text) {
-  const allLines = text.trim().split(/\r?\n/).filter(l => l.trim());
+  const allLines = text.trim().replace(/\r/g, '').split('\n').filter(l => l.trim());
   if (allLines.length < 2) return [];
 
   // ── Wise (TransferWise) detection ──
@@ -2145,10 +2145,15 @@ function parseCSV(text) {
   // ── CommBank detection ──
   // No header row. Format: Date, Amount, Description, Balance
   // Amount is plain number (-9.36) or with $ prefix (-$9.36)
-  const cbCols = allLines[0].split(',');
+  // Strip BOM and any whitespace from first line before checking
+  const cbFirstLine = allLines[0].replace(/^\uFEFF/, '').trim();
+  const cbCols = cbFirstLine.split(',');
   const cbDate = (cbCols[0] || '').replace(/"/g,'').trim();
   const cbAmt  = (cbCols[1] || '').replace(/["$,\s]/g,'').trim();
-  const isCommBank = /^\d{1,2}\/\d{2}\/\d{4}$/.test(cbDate) && /^-?[\d]+\.?\d*$/.test(cbAmt);
+  // Lenient date match — d/mm/yyyy or dd/mm/yyyy
+  const isCommBank = /^\d{1,2}\/\d{1,2}\/\d{4}$/.test(cbDate) && /^-?[\d]+\.?\d*$/.test(cbAmt);
+
+  console.log('CommBank detection:', { cbDate, cbAmt, isCommBank, cbFirstLine });
 
   if (isCommBank) {
     const rows = [];
@@ -2344,7 +2349,8 @@ async function processFile(text, filename) {
     proc.classList.remove('show');
     document.getElementById('uploadZone').style.display = '';
     document.getElementById('supportedBanks').style.display = '';
-    showToast('Could not read file — try a CSV export from your bank');
+    showToast('Could not read file — check console for details');
+    console.error('Parse returned 0 rows. First line of file:', allLines?.[0]);
     return;
   }
 
